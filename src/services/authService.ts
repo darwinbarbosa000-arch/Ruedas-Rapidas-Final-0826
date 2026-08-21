@@ -155,7 +155,7 @@ export async function checkPlacaExistsInDrivers(rawPlaca: string): Promise<boole
  * RATE LIMITING ESTRICTO PARA CONDUCTORES ('otp_attempts/{phone}')
  * Regla: Si un número pide OTP 3 veces en 10 min, bloquearlo 30 min.
  */
-export async function checkDriverOtpRateLimit(formattedPhone: string, cleanDigits: string, options: { allowReset?: boolean } = {}): Promise<void> {
+export async function checkDriverOtpRateLimit(formattedPhone: string, cleanDigits: string, options: { allowReset?: boolean; forceReset?: boolean } = {}): Promise<void> {
   const TEN_MINUTES_MS = 10 * 60 * 1000;
   const THIRTY_MINUTES_MS = 30 * 60 * 1000;
   const now = Date.now();
@@ -163,12 +163,19 @@ export async function checkDriverOtpRateLimit(formattedPhone: string, cleanDigit
   const docId = cleanDigits || formattedPhone.replace(/\D/g, '');
   const attemptDocRef = doc(db, 'otp_attempts', docId);
 
-  if (options.allowReset) {
+  if (options.allowReset || options.forceReset) {
     try {
       await deleteDoc(attemptDocRef);
     } catch {}
     return;
   }
+
+  const isDevOrPreview = typeof window !== 'undefined' && (
+    window.location.hostname.includes('run.app') || 
+    window.location.hostname === 'localhost' ||
+    window.location.hostname === '127.0.0.1'
+  );
+  const MAX_DRIVER_ATTEMPTS = isDevOrPreview ? 10 : 3;
 
   try {
     const attemptDoc = await getDoc(attemptDocRef);
@@ -179,28 +186,36 @@ export async function checkDriverOtpRateLimit(formattedPhone: string, cleanDigit
 
       // 1. Verificar si el número está actualmente bloqueado
       if (blockedUntil && now < blockedUntil) {
-        const remainingMinutes = Math.ceil((blockedUntil - now) / (60 * 1000));
-        throw new Error(`Este número ha sido bloqueado temporalmente por demasiados intentos. Por favor espera ${remainingMinutes} minuto(s) para volver a intentar.`);
+        if (isDevOrPreview) {
+          await deleteDoc(attemptDocRef);
+        } else {
+          const remainingMinutes = Math.ceil((blockedUntil - now) / (60 * 1000));
+          throw new Error(`Este número ha sido bloqueado temporalmente por demasiados intentos. Por favor espera ${remainingMinutes} minuto(s) para volver a intentar.`);
+        }
       }
 
       // 2. Filtrar intentos en los últimos 10 minutos
       const rawAttempts: number[] = Array.isArray(data.attempts) ? data.attempts : [];
       const recentAttempts = rawAttempts.filter(ts => typeof ts === 'number' && (now - ts) < TEN_MINUTES_MS);
 
-      // Si ya tiene 3 o más intentos en los últimos 10 minutos -> aplicar bloqueo de 30 minutos
-      if (recentAttempts.length >= 3) {
-        const newBlockedUntil = now + THIRTY_MINUTES_MS;
-        await setDoc(attemptDocRef, {
-          phone: formattedPhone,
-          cleanDigits: docId,
-          attempts: recentAttempts,
-          blockedUntil: newBlockedUntil,
-          blockedAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          reason: 'Límite de 3 intentos en 10 minutos superado'
-        }, { merge: true });
+      // Si supera el límite de intentos en los últimos 10 minutos -> aplicar bloqueo
+      if (recentAttempts.length >= MAX_DRIVER_ATTEMPTS) {
+        if (!isDevOrPreview) {
+          const newBlockedUntil = now + THIRTY_MINUTES_MS;
+          await setDoc(attemptDocRef, {
+            phone: formattedPhone,
+            cleanDigits: docId,
+            attempts: recentAttempts,
+            blockedUntil: newBlockedUntil,
+            blockedAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            reason: `Límite de ${MAX_DRIVER_ATTEMPTS} intentos en 10 minutos superado`
+          }, { merge: true });
 
-        throw new Error('Has solicitado el código 3 veces en 10 minutos. Tu número ha sido bloqueado por 30 minutos por seguridad.');
+          throw new Error(`Has solicitado el código ${MAX_DRIVER_ATTEMPTS} veces en 10 minutos. Tu número ha sido bloqueado por 30 minutos por seguridad.`);
+        } else {
+          await deleteDoc(attemptDocRef);
+        }
       }
 
       // 3. Registrar el nuevo intento
@@ -225,10 +240,10 @@ export async function checkDriverOtpRateLimit(formattedPhone: string, cleanDigit
       });
     }
   } catch (error: any) {
-    if (error.message && (error.message.includes('bloqueado') || error.message.includes('límite') || error.message.includes('espera'))) {
+    if (error.message && (error.message.includes('bloqueado') || error.message.includes('límite'))) {
       throw error;
     }
-    console.warn('Aviso verificando rate limit de conductor:', error);
+    console.warn('Aviso comprobando rate limit de conductor en Firestore:', error);
   }
 }
 
@@ -363,19 +378,27 @@ export async function resetOtpRateLimit(phone: string): Promise<void> {
   console.info('Rate limit restablecido para:', cleanDigits);
 }
 
-export async function checkAndRecordOtpRateLimit(formattedPhone: string, cleanDigits: string, options: { allowReset?: boolean } = {}): Promise<void> {
+export async function checkAndRecordOtpRateLimit(formattedPhone: string, cleanDigits: string, options: { allowReset?: boolean; forceReset?: boolean } = {}): Promise<void> {
   const FIVE_MINUTES_MS = 5 * 60 * 1000;
   const FIFTEEN_MINUTES_MS = 15 * 60 * 1000;
   const now = Date.now();
 
   const attemptDocRef = doc(db, 'otp_attempts', cleanDigits);
 
-  if (options.allowReset) {
+  if (options.allowReset || options.forceReset) {
     try {
       await resetOtpRateLimit(formattedPhone);
     } catch {}
     return;
   }
+
+  // En entornos de desarrollo/pruebas o Cloud Run dev/preview, elevar el umbral para evitar bloqueos continuos
+  const isDevOrPreview = typeof window !== 'undefined' && (
+    window.location.hostname.includes('run.app') || 
+    window.location.hostname === 'localhost' ||
+    window.location.hostname === '127.0.0.1'
+  );
+  const MAX_ATTEMPTS = isDevOrPreview ? 10 : 3;
 
   try {
     const attemptDoc = await getDoc(attemptDocRef);
@@ -386,27 +409,38 @@ export async function checkAndRecordOtpRateLimit(formattedPhone: string, cleanDi
 
       // 1. Verificar si el número está activamente bloqueado
       if (blockedUntil && now < blockedUntil) {
-        const remainingMinutes = Math.ceil((blockedUntil - now) / (60 * 1000));
-        throw new Error(`Este número ha sido bloqueado temporalmente por demasiados intentos. Por favor espera ${remainingMinutes} minuto(s) para volver a intentar.`);
+        if (isDevOrPreview) {
+          // En pruebas, auto-restablecer para no dejar bloqueado al tester/desarrollador
+          await resetOtpRateLimit(formattedPhone);
+          console.info('Auto-desbloqueo de desarrollo aplicado para:', formattedPhone);
+        } else {
+          const remainingMinutes = Math.ceil((blockedUntil - now) / (60 * 1000));
+          throw new Error(`Este número ha sido bloqueado temporalmente por demasiados intentos. Por favor espera ${remainingMinutes} minuto(s) para volver a intentar.`);
+        }
       }
 
       // 2. Filtrar intentos ocurridos en los últimos 5 minutos
       const rawAttempts: number[] = Array.isArray(data.attempts) ? data.attempts : [];
       const recentAttempts = rawAttempts.filter(ts => typeof ts === 'number' && (now - ts) < FIVE_MINUTES_MS);
 
-      // Si ya tiene 3 o más intentos en los últimos 5 minutos -> aplicar bloqueo de 15 minutos
-      if (recentAttempts.length >= 3) {
-        const newBlockedUntil = now + FIFTEEN_MINUTES_MS;
-        await setDoc(attemptDocRef, {
-          phone: formattedPhone,
-          cleanDigits,
-          attempts: recentAttempts,
-          blockedUntil: newBlockedUntil,
-          blockedAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        }, { merge: true });
+      // Si ya supera el límite de intentos en los últimos 5 minutos -> aplicar bloqueo
+      if (recentAttempts.length >= MAX_ATTEMPTS) {
+        if (!isDevOrPreview) {
+          const newBlockedUntil = now + FIFTEEN_MINUTES_MS;
+          await setDoc(attemptDocRef, {
+            phone: formattedPhone,
+            cleanDigits,
+            attempts: recentAttempts,
+            blockedUntil: newBlockedUntil,
+            blockedAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          }, { merge: true });
 
-        throw new Error('Has solicitado el código 3 veces en 5 minutos. Tu número ha sido bloqueado por 15 minutos por seguridad.');
+          throw new Error(`Has solicitado el código ${MAX_ATTEMPTS} veces en 5 minutos. Tu número ha sido bloqueado por 15 minutos por seguridad.`);
+        } else {
+          // En dev/preview simplemente reiniciamos el contador
+          await resetOtpRateLimit(formattedPhone);
+        }
       }
 
       // 3. Registrar el nuevo intento
