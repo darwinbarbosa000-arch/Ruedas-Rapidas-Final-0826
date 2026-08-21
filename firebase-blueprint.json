@@ -1,0 +1,379 @@
+{
+  "entities": {
+    "UserAuth": {
+      "title": "UserAuth",
+      "description": "Información de autenticación, teléfono y dispositivos del usuario",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["pending", "active", "suspended"] },
+        "deviceIds": { "type": "array", "items": { "type": "string" } },
+        "devices": { "type": "array", "items": { "type": "object" } },
+        "lastActiveDeviceId": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "phone", "createdAt", "status"]
+    },
+    "OtpAttempt": {
+      "title": "OtpAttempt",
+      "description": "Registro de intentos OTP y rate limiting por número",
+      "type": "object",
+      "properties": {
+        "phone": { "type": "string" },
+        "cleanDigits": { "type": "string" },
+        "attempts": { "type": "array", "items": { "type": "number" } },
+        "blockedUntil": { "type": "number" },
+        "blockedAt": { "type": "string", "format": "date-time" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["phone", "cleanDigits", "attempts"]
+    },
+    "Driver": {
+      "title": "Driver",
+      "description": "Expediente de registro seguro de conductor con validación KYC",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "nombre": { "type": "string" },
+        "telefono": { "type": "string" },
+        "cedula": { "type": "string" },
+        "placa": { "type": "string" },
+        "fotoCedulaUrl": { "type": "string" },
+        "deviceId": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected", "suspended"] },
+        "aprobado": { "type": "boolean" },
+        "vehiculoTipo": { "type": "string" },
+        "vehiculoModelo": { "type": "string" },
+        "ciudad": { "type": "string" },
+        "departamento": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "nombre", "telefono", "placa", "fotoCedulaUrl", "status", "deviceId", "createdAt"]
+    },
+    "Usuario": {
+      "title": "Usuario",
+      "description": "Perfil de usuario o administrador",
+      "type": "object",
+      "properties": {
+        "nombre": { "type": "string", "description": "Nombre completo" },
+        "email": { "type": "string", "format": "email" },
+        "cedula": { "type": "string", "description": "Número de identificación" },
+        "telefono": { "type": "string" },
+        "genero": { "type": "string", "enum": ["masculino", "femenino", "otro"] },
+        "departamento": { "type": "string" },
+        "ciudad": { "type": "string" },
+        "saldo_promo": { "type": "number", "description": "Saldo promocional inicial de 10,000 COP" },
+        "rol": { "type": "string", "enum": ["usuario", "admin", "admin_suplente"], "description": "Rol del usuario" },
+        "servicios_count": { "type": "number", "description": "Total de viajes realizados por el usuario" },
+        "terminos_aceptados": { "type": "boolean", "description": "Si el usuario aceptó los términos y condiciones" },
+        "fecha_aceptacion_terminos": { "type": "string", "format": "date-time", "description": "Fecha en que se aceptaron los términos" }
+      },
+      "required": ["nombre", "email", "cedula", "telefono", "genero", "departamento", "ciudad", "saldo_promo", "rol", "terminos_aceptados"]
+    },
+    "Conductor": {
+      "title": "Conductor",
+      "description": "Perfil de conductor con tarjeta virtual",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Referencia al documento de usuario" },
+        "tarjeta_virtual": { "type": "number", "description": "Saldo inicial de 50,000 COP" },
+        "activo": { "type": "boolean", "description": "Estado de conexión" },
+        "modo_repartidor": { "type": "boolean", "description": "Switch independiente para domicilios" },
+        "documentos_autorizados": {
+          "type": "object",
+          "properties": {
+            "licencia": { "type": "boolean" },
+            "soat": { "type": "boolean" },
+            "cedula": { "type": "boolean" }
+          }
+        },
+        "calificacion": { "type": "number", "description": "Promedio de estrellas" },
+        "total_calificaciones": { "type": "number", "description": "Cantidad total de calificaciones recibidas" },
+        "servicios_completados": { "type": "number", "description": "Total de viajes completados por el conductor" },
+        "genero": { "type": "string", "enum": ["masculino", "femenino", "otro"] },
+        "ciudad": { "type": "string" },
+        "vehiculo": {
+          "type": "object",
+          "properties": {
+            "tipo": { "type": "string", "enum": ["moto", "carro", "camion_flete", "camion_acarreo"] },
+            "placa": { "type": "string" },
+            "modelo": { "type": "string" }
+          },
+          "required": ["tipo", "placa", "modelo"]
+        },
+        "expreso_habilitado": { "type": "boolean", "description": "Si el admin autorizó para servicio expreso" },
+        "expreso_activo": { "type": "boolean", "description": "Si el conductor tiene activa la recepción de viajes expresos" }
+      },
+      "required": ["userId", "tarjeta_virtual", "activo", "modo_repartidor", "documentos_autorizados", "calificacion", "total_calificaciones", "genero", "ciudad", "vehiculo"]
+    },
+    "Viaje": {
+      "title": "Viaje",
+      "description": "Información del servicio de transporte o domicilio",
+      "type": "object",
+      "properties": {
+        "usuarioId": { "type": "string" },
+        "conductorId": { "type": "string" },
+        "ruta": {
+          "type": "object",
+          "properties": {
+            "origen": { "type": "string" },
+            "destino": { "type": "string" }
+          }
+        },
+        "valor": { "type": "number", "description": "Valor total del viaje" },
+        "comision": { "type": "number", "description": "8% del valor del viaje" },
+        "estado": { "type": "string", "enum": ["solicitado", "negociando", "aceptado", "en_curso", "finalizado", "cancelado"] },
+        "tipo": { "type": "string", "enum": ["carro", "moto", "domicilio"] },
+        "ciudad": { "type": "string" },
+        "fecha": { "type": "string", "format": "date-time" },
+        "calificado": { "type": "boolean", "description": "Si el viaje ya fue calificado por el usuario" },
+        "conductorCalificacion": { "type": "number", "description": "Calificación del conductor en el momento del viaje" },
+        "tiempo_llegada": { "type": "number", "description": "Tiempo de llegada prometido en minutos" },
+        "fecha_aceptacion": { "type": "string", "format": "date-time", "description": "Fecha en que se aceptó el servicio para iniciar el conteo" },
+        "ofertas": {
+          "type": "object",
+          "description": "Mapa de ofertas de conductores",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "conductorId": { "type": "string" },
+              "conductorNombre": { "type": "string" },
+              "conductorCalificacion": { "type": "number" },
+              "valor": { "type": "number" },
+              "tiempo_llegada": { "type": "number" },
+              "fecha": { "type": "string", "format": "date-time" }
+            }
+          }
+        }
+      },
+      "required": ["usuarioId", "ruta", "valor", "estado", "ciudad", "fecha"]
+    },
+    "Calificacion": {
+      "title": "Calificacion",
+      "description": "Calificación de un servicio",
+      "type": "object",
+      "properties": {
+        "conductorId": { "type": "string" },
+        "usuarioId": { "type": "string" },
+        "viajeId": { "type": "string" },
+        "estrellas": { "type": "number", "description": "1 a 5 estrellas" },
+        "comentario": { "type": "string", "description": "Obligatorio si estrellas < 3" },
+        "fecha": { "type": "string", "format": "date-time" }
+      },
+      "required": ["conductorId", "usuarioId", "viajeId", "estrellas", "fecha"]
+    },
+    "Transaccion": {
+      "title": "Transaccion",
+      "description": "Registro de recargas y comisiones",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "tipo": { "type": "string", "enum": ["recarga", "comision"] },
+        "valor": { "type": "number" },
+        "referencia": { "type": "string", "description": "Referencia de pago o ID de viaje" },
+        "fecha": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "tipo", "valor", "fecha"]
+    },
+    "Recarga": {
+      "title": "Recarga",
+      "description": "Solicitud de recarga de saldo por el conductor",
+      "type": "object",
+      "properties": {
+        "conductorId": { "type": "string" },
+        "conductorNombre": { "type": "string" },
+        "valor": { "type": "number", "enum": [10000, 20000] },
+        "estado": { "type": "string", "enum": ["pendiente", "aprobada", "rechazada"] },
+        "fecha": { "type": "string", "format": "date-time" },
+        "nubankKey": { "type": "string" }
+      },
+      "required": ["conductorId", "valor", "estado", "fecha"]
+    },
+    "SoporteChat": {
+      "title": "SoporteChat",
+      "description": "Chat de soporte entre conductor y administrador",
+      "type": "object",
+      "properties": {
+        "conductorId": { "type": "string" },
+        "conductorNombre": { "type": "string" },
+        "ultimaMensaje": { "type": "string" },
+        "ultimaFecha": { "type": "string", "format": "date-time" },
+        "leidoPorAdmin": { "type": "boolean" },
+        "leidoPorConductor": { "type": "boolean" }
+      },
+      "required": ["conductorId", "conductorNombre", "ultimaFecha"]
+    },
+    "SoporteMensaje": {
+      "title": "SoporteMensaje",
+      "description": "Mensaje individual en el chat de soporte",
+      "type": "object",
+      "properties": {
+        "senderId": { "type": "string" },
+        "senderName": { "type": "string" },
+        "text": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "isAdmin": { "type": "boolean" }
+      },
+      "required": ["senderId", "text", "timestamp"]
+    },
+    "GlobalStats": {
+      "title": "GlobalStats",
+      "description": "Estadísticas globales de la plataforma",
+      "type": "object",
+      "properties": {
+        "total_servicios_completados": { "type": "number", "description": "Acumulado total de servicios exitosos en la plataforma" }
+      }
+    },
+    "LeaderboardEntry": {
+      "title": "LeaderboardEntry",
+      "description": "Entrada individual en el ranking",
+      "type": "object",
+      "properties": {
+        "conductorId": { "type": "string" },
+        "nombre": { "type": "string" },
+        "servicios": { "type": "number" },
+        "calificacion": { "type": "number" },
+        "foto": { "type": "string" }
+      }
+    },
+    "WeeklyRank": {
+      "title": "WeeklyRank",
+      "description": "Ranking semanal por categoría",
+      "type": "object",
+      "properties": {
+        "categoria": { "type": "string" },
+        "periodo": { "type": "string" },
+        "top": {
+          "type": "array",
+          "items": { "$ref": "#/entities/LeaderboardEntry" }
+        },
+        "ultimaActualizacion": { "type": "string", "format": "date-time" }
+      }
+    },
+    "UbicacionViaje": {
+      "title": "UbicacionViaje",
+      "description": "Coordenadas GPS en tiempo real para un viaje activo",
+      "type": "object",
+      "properties": {
+        "conductor": {
+          "type": "object",
+          "properties": {
+            "lat": { "type": "number" },
+            "lng": { "type": "number" },
+            "heading": { "type": "number" },
+            "updatedAt": { "type": "string", "format": "date-time" }
+          }
+        },
+        "pasajero": {
+          "type": "object",
+          "properties": {
+            "lat": { "type": "number" },
+            "lng": { "type": "number" },
+            "updatedAt": { "type": "string", "format": "date-time" }
+          }
+        }
+      }
+    },
+    "ExpresoViaje": {
+      "title": "Viaje Expreso",
+      "description": "Servicio compartido Fusa-Bogotá",
+      "type": "object",
+      "properties": {
+        "conductorId": { "type": "string" },
+        "conductorNombre": { "type": "string" },
+        "conductorCalificacion": { "type": "number" },
+        "origen": { "type": "string" },
+        "destino": { "type": "string" },
+        "puntoEncuentro": { "type": "string" },
+        "fechaSalida": { "type": "string", "format": "date-time" },
+        "vehiculo": {
+          "type": "object",
+          "properties": {
+            "tipo": { "type": "string" },
+            "placa": { "type": "string" },
+            "modelo": { "type": "string" }
+          }
+        },
+        "cuposTotales": { "type": "number" },
+        "cuposDisponibles": { "type": "number" },
+        "valorPorCupo": { "type": "number" },
+        "estado": { "type": "string", "enum": ["programado", "en_curso", "completado", "cancelado"] },
+        "pasajeros": {
+          "type": "object",
+          "description": "Mapa de pasajeros {userId: {nombre, fecha, cupos}}",
+          "additionalProperties": { "type": "object" }
+        },
+        "fechaCreacion": { "type": "string", "format": "date-time" }
+      },
+      "required": ["conductorId", "origen", "destino", "fechaSalida", "cuposTotales", "cuposDisponibles", "valorPorCupo", "estado"]
+    },
+    "MarcaAliada": {
+      "title": "Marca Aliada",
+      "description": "Negocio aliado (restaurante, droguería, ferretería) que actúa como punto fijo",
+      "type": "object",
+      "properties": {
+        "nombre": { "type": "string" },
+        "direccion": { "type": "string" },
+        "ciudad": { "type": "string" },
+        "whatsapp": { "type": "string" },
+        "categoria": { "type": "string" },
+        "fechaCreacion": { "type": "string", "format": "date-time" }
+      },
+      "required": ["nombre", "direccion", "ciudad", "whatsapp", "categoria"]
+    },
+    "MensajeAdmin": {
+      "title": "MensajeAdmin",
+      "description": "Mensaje de soporte/admin o notificación del sistema",
+      "type": "object",
+      "properties": {
+        "chatId": { "type": "string" },
+        "mensaje": { "type": "string" },
+        "senderId": { "type": "string" },
+        "senderNombre": { "type": "string" },
+        "targetId": { "type": "string" },
+        "targetNombre": { "type": "string" },
+        "tipoTarget": { "type": "string", "enum": ["usuario", "conductor"] },
+        "fecha": { "type": "string", "format": "date-time" },
+        "leido": { "type": "boolean" },
+        "tipo": { "type": "string" }
+      },
+      "required": ["chatId", "mensaje", "senderId", "senderNombre", "targetId", "targetNombre", "tipoTarget", "fecha", "leido"]
+    },
+    "MensajeViaje": {
+      "title": "MensajeViaje",
+      "description": "Mensaje de chat individual dentro de un viaje",
+      "type": "object",
+      "properties": {
+        "senderId": { "type": "string" },
+        "senderName": { "type": "string" },
+        "text": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["senderId", "senderName", "text"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": { "schema": "UserAuth", "description": "Documentos de autenticación, teléfono y estado por usuario" },
+    "/drivers/{driverId}": { "schema": "Driver", "description": "Expedientes de conductores registrados con validación de placa y KYC" },
+    "/otp_attempts/{attemptId}": { "schema": "OtpAttempt", "description": "Control de rate limiting para envío de códigos OTP" },
+    "/usuarios/{userId}": { "schema": "Usuario", "description": "Colección de perfiles de usuarios" },
+    "/conductores/{conductorId}": { "schema": "Conductor", "description": "Colección de conductores" },
+    "/viajes/{viajeId}": { "schema": "Viaje", "description": "Colección de viajes" },
+    "/calificaciones/{calificacionId}": { "schema": "Calificacion", "description": "Calificaciones de los servicios" },
+    "/transacciones/{transaccionId}": { "schema": "Transaccion", "description": "Historial financiero" },
+    "/recargas/{recargaId}": { "schema": "Recarga", "description": "Solicitudes de recarga" },
+    "/soporte_chats/{conductorId}": { "schema": "SoporteChat", "description": "Chats de soporte activos" },
+    "/soporte_chats/{conductorId}/mensajes/{mensajeId}": { "schema": "SoporteMensaje", "description": "Mensajes del chat de soporte" },
+    "/ubicaciones_viaje/{viajeId}": { "schema": "UbicacionViaje", "description": "Seguimiento GPS en tiempo real" },
+    "/config/stats": { "schema": "GlobalStats", "description": "Contadores globales del sistema" },
+    "/expreso_viajes/{viajeId}": { "schema": "ExpresoViaje", "description": "Viajes compartidos programados" },
+    "/marcas_aliadas/{marcaId}": { "schema": "MarcaAliada", "description": "Negocios locales asociados" },
+    "/mensajes_admin/{mensajeId}": { "schema": "MensajeAdmin", "description": "Mensajes y notificaciones del admin" },
+    "/viajes/{viajeId}/mensajes/{mensajeId}": { "schema": "MensajeViaje", "description": "Chat dentro de un viaje" }
+  }
+}

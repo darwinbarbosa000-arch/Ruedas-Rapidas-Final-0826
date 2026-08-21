@@ -1,0 +1,10 @@
+{
+  "name": "Ruedas Rápidas",
+  "description": "Aplicación de transporte multicanal (Moto/Carro/Domicilio) en Colombia con perfiles de Usuario, Conductor y Admin.",
+  "requestFramePermissions": [
+    "geolocation"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

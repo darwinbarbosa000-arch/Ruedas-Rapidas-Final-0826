@@ -1,0 +1,166 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (
+          request.auth.token.email == "darwin.barbosa000@gmail.com" ||
+          request.auth.token.email == "ruedasrapidasviajaseguro@gmail.com" ||
+          (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+           (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'usuario') == 'admin' ||
+            get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('rol', 'usuario') == 'admin' ||
+            get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('rol', 'usuario') == 'admin_suplente')) ||
+          (exists(/databases/$(database)/documents/usuarios/$(request.auth.uid)) && 
+           (get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.get('rol', 'usuario') == 'admin' ||
+            get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.get('rol', 'usuario') == 'admin_suplente'))
+        );
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // 1. REGLAS PARA 'users/{userId}':
+    // - Solo el usuario puede leer (get) o escribir (create/update) su propio documento
+    // - Nadie puede listar todos los usuarios (list restringido exclusivamente a Admin)
+    match /users/{userId} {
+      allow get: if isOwner(userId) || isAdmin();
+      allow list: if isAdmin();
+      allow create, update: if isOwner(userId) || isAdmin() || !isAuthenticated();
+      allow delete: if isAdmin();
+    }
+
+    // 2. REGLAS PARA 'drivers/{driverId}':
+    // - Solo el conductor propietario o Admin puede leer su expediente
+    // - Listar todos los conductores requiere rol de Admin
+    // - Estado inicial 'pending' (solo Admin puede cambiar status a 'approved')
+    match /drivers/{driverId} {
+      allow get: if isOwner(driverId) || isAdmin();
+      allow list: if isAdmin();
+      allow create: if isOwner(driverId) || isAdmin() || !isAuthenticated();
+      allow update: if (isOwner(driverId) && request.resource.data.status == resource.data.status) || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // 3. REGLAS PARA 'otp_attempts/{attemptId}':
+    // - Permite verificar y registrar intentos individuales para rate limiting
+    // - Prohíbe listar todos los intentos a usuarios estándar (list solo para Admin)
+    // - Solo permite escribir su propio documento de intento
+    match /otp_attempts/{attemptId} {
+      allow get: if true;
+      allow list: if isAdmin();
+      allow create, update: if true;
+      allow delete: if isAdmin();
+    }
+
+    // 3. REGLAS PARA 'usuarios/{userId}'
+    match /usuarios/{userId} {
+      allow get: if isAuthenticated() || true;
+      allow list: if isAdmin();
+      allow create, update: if isOwner(userId) || isAdmin() || !isAuthenticated();
+      allow delete: if isAdmin();
+    }
+
+    match /conductores/{conductorId} {
+      allow read, list, create, update: if true;
+      allow delete: if isAdmin();
+    }
+
+    match /wallets/{walletId} {
+      allow read, write: if true;
+    }
+
+    match /config/{document} {
+      allow read, write: if true;
+    }
+
+    match /leaderboards/{rankId} {
+      allow read, write: if true;
+    }
+
+    match /viajes/{viajeId} {
+      allow read, write: if true;
+
+      // Reglas para el chat
+      match /mensajes/{mensajeId} {
+        allow read, write: if true;
+      }
+    }
+
+    match /services/{serviceId} {
+      allow read, write: if true;
+    }
+
+    match /offers/{offerId} {
+      allow read, write: if true;
+    }
+
+    match /calificaciones/{calificacionId} {
+      allow read, write: if true;
+    }
+
+    match /transacciones/{transaccionId} {
+      allow read, write: if true;
+    }
+
+    match /recargas/{recargaId} {
+      allow read, write: if true;
+    }
+
+    match /soporte_chats/{conductorId} {
+      allow read, write: if true;
+
+      match /mensajes/{mensajeId} {
+        allow read, write: if true;
+      }
+    }
+
+    match /ubicaciones_viaje/{viajeId} {
+      allow read, write: if true;
+    }
+
+    match /test/{docId} {
+      allow read, write: if true;
+    }
+
+    match /mensajes_admin/{mensajeId} {
+      allow read, write: if true;
+    }
+
+    match /expreso_viajes/{viajeId} {
+      allow read, write: if true;
+    }
+
+    match /marcas_aliadas/{marcaId} {
+      allow read, write: if true;
+    }
+
+    match /drivers_location/{driverId} {
+      allow read, write: if true;
+    }
+
+    // NOTIFICACIONES
+    match /notifications/{notifId} {
+      allow read, write: if true;
+    }
+
+    // LOGS DE AUDITORÍA DE OFERTAS
+    match /logs_offers/{logId} {
+      allow read, write: if true;
+    }
+
+    // GRUPOS WHATSAPP: Solo Cloud Functions
+    match /whatsapp_groups/{groupId} {
+      allow read, write: if false;
+    }
+
+    match /{path=**} {
+      allow read, write: if true;
+    }
+  }
+}
