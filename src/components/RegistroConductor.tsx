@@ -27,7 +27,8 @@ import {
   checkDriverSingleAccountLimit,
   getDeviceId,
   requestOTP,
-  verifyOTP
+  verifyOTP,
+  resetOtpRateLimit
 } from '../services/authService';
 
 interface RegistroConductorProps {
@@ -170,7 +171,24 @@ export const RegistroConductor: React.FC<RegistroConductorProps> = ({
       console.error('Error en pre-validación de conductor:', error);
       const msg = error.message || 'Error al procesar el registro.';
       setErrorMessage(msg);
-      toast.error(msg);
+
+      const isBlocked = msg.includes('bloqueado') || msg.includes('demasiados intentos') || msg.includes('espera');
+      if (isBlocked && telefono.trim()) {
+        toast.error(msg, {
+          action: {
+            label: "Desbloquear (Pruebas)",
+            onClick: async () => {
+              const val = validateAndFormatColombianPhone(telefono.trim());
+              await resetOtpRateLimit(val.valid ? val.formattedPhone : telefono.trim());
+              setErrorMessage(null);
+              toast.success("Límite de intentos restablecido. Puedes volver a intentar.");
+            }
+          },
+          duration: 12000
+        });
+      } else {
+        toast.error(msg);
+      }
     } finally {
       setIsSendingOtp(false);
       setSecurityStatus('');

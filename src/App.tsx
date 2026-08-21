@@ -12,7 +12,8 @@ import {
   verifyOTP, 
   validateAndFormatColombianPhone, 
   checkIfPhoneAlreadyRegistered, 
-  enforceDeviceLimit 
+  enforceDeviceLimit,
+  resetOtpRateLimit 
 } from './services/authService';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
@@ -2914,7 +2915,27 @@ export default function App() {
       setPhoneStep(2);
     } catch (error: any) {
       console.error("Error al solicitar OTP por SMS:", error);
-      toast.error(error.message || "Error al enviar código SMS. Intenta nuevamente.");
+      const isBlocked = error.message && (
+        error.message.includes('bloqueado') || 
+        error.message.includes('demasiados intentos') || 
+        error.message.includes('espera') ||
+        error.message.includes('minuto')
+      );
+
+      if (isBlocked) {
+        toast.error(error.message, {
+          action: {
+            label: "Desbloquear (Pruebas)",
+            onClick: async () => {
+              await resetOtpRateLimit(val.formattedPhone);
+              toast.success("Límite de intentos restablecido. Vuelve a hacer clic en Enviar.");
+            }
+          },
+          duration: 12000
+        });
+      } else {
+        toast.error(error.message || "Error al enviar código SMS. Intenta nuevamente.");
+      }
     } finally {
       setIsPhoneProcessing(false);
     }

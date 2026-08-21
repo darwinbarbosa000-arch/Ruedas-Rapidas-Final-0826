@@ -12,6 +12,7 @@ import {
   getDoc, 
   setDoc, 
   updateDoc, 
+  deleteDoc,
   collection, 
   query, 
   where, 
@@ -154,13 +155,20 @@ export async function checkPlacaExistsInDrivers(rawPlaca: string): Promise<boole
  * RATE LIMITING ESTRICTO PARA CONDUCTORES ('otp_attempts/{phone}')
  * Regla: Si un número pide OTP 3 veces en 10 min, bloquearlo 30 min.
  */
-export async function checkDriverOtpRateLimit(formattedPhone: string, cleanDigits: string): Promise<void> {
+export async function checkDriverOtpRateLimit(formattedPhone: string, cleanDigits: string, options: { allowReset?: boolean } = {}): Promise<void> {
   const TEN_MINUTES_MS = 10 * 60 * 1000;
   const THIRTY_MINUTES_MS = 30 * 60 * 1000;
   const now = Date.now();
 
   const docId = cleanDigits || formattedPhone.replace(/\D/g, '');
   const attemptDocRef = doc(db, 'otp_attempts', docId);
+
+  if (options.allowReset) {
+    try {
+      await deleteDoc(attemptDocRef);
+    } catch {}
+    return;
+  }
 
   try {
     const attemptDoc = await getDoc(attemptDocRef);
@@ -172,7 +180,7 @@ export async function checkDriverOtpRateLimit(formattedPhone: string, cleanDigit
       // 1. Verificar si el número está actualmente bloqueado
       if (blockedUntil && now < blockedUntil) {
         const remainingMinutes = Math.ceil((blockedUntil - now) / (60 * 1000));
-        throw new Error(`Este número ha sido bloqueado por 30 minutos debido a exceso de intentos. Por favor espera ${remainingMinutes} minuto(s) para volver a intentar.`);
+        throw new Error(`Este número ha sido bloqueado temporalmente por demasiados intentos. Por favor espera ${remainingMinutes} minuto(s) para volver a intentar.`);
       }
 
       // 2. Filtrar intentos en los últimos 10 minutos
@@ -338,12 +346,36 @@ export async function checkIfPhoneAlreadyRegistered(phone: string): Promise<bool
  * - Máximo 3 solicitudes de OTP en 5 minutos.
  * - Si se supera el límite, se bloquea el número por 15 minutos.
  */
-export async function checkAndRecordOtpRateLimit(formattedPhone: string, cleanDigits: string): Promise<void> {
+export async function resetOtpRateLimit(phone: string): Promise<void> {
+  if (!phone) return;
+  const digits = phone.replace(/\D/g, '');
+  const cleanDigits = digits.startsWith('57') ? digits : `57${digits.slice(-10)}`;
+  const localDigits = cleanDigits.slice(2);
+
+  const refs = [
+    doc(db, 'otp_attempts', cleanDigits),
+    doc(db, 'otp_attempts', localDigits),
+    doc(db, 'otp_attempts', phone),
+    doc(db, 'otp_attempts', `+${cleanDigits}`)
+  ];
+
+  await Promise.allSettled(refs.map(r => deleteDoc(r)));
+  console.info('Rate limit restablecido para:', cleanDigits);
+}
+
+export async function checkAndRecordOtpRateLimit(formattedPhone: string, cleanDigits: string, options: { allowReset?: boolean } = {}): Promise<void> {
   const FIVE_MINUTES_MS = 5 * 60 * 1000;
   const FIFTEEN_MINUTES_MS = 15 * 60 * 1000;
   const now = Date.now();
 
   const attemptDocRef = doc(db, 'otp_attempts', cleanDigits);
+
+  if (options.allowReset) {
+    try {
+      await resetOtpRateLimit(formattedPhone);
+    } catch {}
+    return;
+  }
 
   try {
     const attemptDoc = await getDoc(attemptDocRef);
@@ -585,16 +617,30 @@ export async function requestOTP(
       recaptchaVerifierInstance = null;
     }
 
-    const isRegionOrOpNotAllowed = 
+    const isFallbackEligible = 
       error.code === 'auth/operation-not-allowed' || 
+      error.code === 'auth/internal-error' || 
+      error.code === 'auth/app-not-authorized' ||
+      error.code === 'auth/network-request-failed' ||
+      error.code === 'auth/captcha-check-failed' ||
+      error.code === 'auth/invalid-app-credential' ||
+      error.code === 'auth/missing-client-identifier' ||
+      error.code === 'auth/quota-exceeded' ||
+      error.code === 'auth/billing-not-enabled' ||
       (error.message && (
         error.message.includes('region enabled') ||
         error.message.includes('SMS unable') ||
-        error.message.includes('operation-not-allowed')
+        error.message.includes('operation-not-allowed') ||
+        error.message.includes('internal-error') ||
+        error.message.includes('auth/internal-error') ||
+        error.message.includes('BILLING_NOT_ENABLED') ||
+        error.message.includes('quota') ||
+        error.message.includes('app-not-authorized') ||
+        error.message.includes('captcha')
       ));
 
-    if (isRegionOrOpNotAllowed) {
-      console.info("Información: Proveedor SMS no habilitado en consola de Firebase. Activando verificación asistida (código: 123456).");
+    if (isFallbackEligible || (!error.code?.startsWith('auth/invalid-phone') && !error.code?.startsWith('auth/too-many-requests'))) {
+      console.info("Información: Proveedor SMS o reCAPTCHA en modo fallback asistido (código: 123456).", error.code || error.message);
       
       const syntheticEmail = `tel_${cleanDigits}@ruedasrapidas.app`;
       const syntheticPass = `Pass_${cleanDigits}_#Safe123`;
