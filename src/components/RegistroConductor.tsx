@@ -1,8 +1,9 @@
 export default function RegistroConductor() {
   return (
     <div style={{padding: '40px', textAlign: 'center'}}>
-      <h1>Registro Conductor</h1>
-      <p>Componente temporal - ya compila</p>
+      <h1>Driver Registration</h1>
+      <p>Temporary component - build successful</p>
     </div>
   )
 }
+
