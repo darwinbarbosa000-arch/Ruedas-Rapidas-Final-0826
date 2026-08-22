@@ -45,7 +45,7 @@ import { RideTracker } from './components/RideTracker';
 import { MapComponent, MapPoint } from './components/MapComponent';
 import { AdminDriversPanel } from './components/AdminDriversPanel';
 import DriverOfferModal from './components/DriverOfferModal';
-import { RegistroConductor } from './components/RegistroConductor';
+import RegistroConductor from './components/RegistroConductor';
 
 const GOOGLE_MAPS_LIBRARIES: ("places")[] = ['places'];
 
