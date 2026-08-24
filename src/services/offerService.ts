@@ -213,16 +213,16 @@ export async function submitOffer(params: OfferSubmitParams) {
     throw new Error('Estás muy lejos del usuario. Máximo 25km para ofertar');
   }
 
-  // Verificar Saldo en Tarjeta Virtual (Comisión 8%)
+  // Verificar Saldo en Tarjeta Virtual (Comisión 15%)
   const conductorRef = doc(db, 'conductores', driverId);
   const conductorSnap = await getDoc(conductorRef);
   const conductorData = conductorSnap.exists() ? conductorSnap.data() : null;
 
   if (conductorData) {
-    const comision = price_propuesto * 0.08;
+    const comision = Math.round(price_propuesto * 0.15);
     const saldoActual = conductorData.tarjeta_virtual || 0;
     if (saldoActual < comision) {
-      throw new Error(`Tu saldo en Tarjeta Virtual es insuficiente ($${formatCOP(saldoActual)} COP). Requieres al menos $${formatCOP(comision)} COP (8% de comisión).`);
+      throw new Error(`Tu saldo en Tarjeta Virtual es insuficiente ($${formatCOP(saldoActual)} COP). Requieres al menos $${formatCOP(comision)} COP (15% de comisión requerida).`);
     }
   }
 
@@ -387,12 +387,12 @@ export async function acceptOffer(params: AcceptOfferParams) {
   const walletRef = doc(db, 'wallets', selectedDriverId);
 
   const valorOferta = Number(offer.price || offer.price_propuesto || offer.valor || serviceData.valor || 0);
-  const comision = Math.round(valorOferta * 0.08);
+  const comision = Math.round(valorOferta * 0.15);
   const nowIso = new Date().toISOString();
 
   let updatedServiceData: any = null;
 
-  // TRANSACTION ATÓMICA: ACEPTAR + COBRAR COMISIÓN 8%
+  // TRANSACTION ATÓMICA: ACEPTAR + COBRAR COMISIÓN 15%
   await runTransaction(db, async (transaction) => {
     // 1. LECTURAS
     const currentServiceSnap = await transaction.get(serviceRef);
@@ -413,7 +413,7 @@ export async function acceptOffer(params: AcceptOfferParams) {
 
     // 2. VALIDAR SALDO DEL CONDUCTOR
     if (currentBalance < comision) {
-      throw new Error('El conductor no tiene saldo suficiente para la comisión');
+      throw new Error(`El conductor no tiene saldo suficiente en Tarjeta Virtual ($${formatCOP(currentBalance)} COP). Se requiere $${formatCOP(comision)} COP (15% de comisión).`);
     }
 
     const vehiculo = offer.vehiculo || offer.conductorVehiculo || driverDocData.vehiculo || {};

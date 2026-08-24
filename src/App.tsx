@@ -1036,27 +1036,24 @@ export default function App() {
   const categoriesScrollProps = useDragToScroll(categoriesScrollRef, 'x');
 
   const [activeTab, setActiveTab] = useState<'home' | 'usuario' | 'conductor' | 'admin' | 'leaderboard'>('home');
-  const [showDriverInvite, setShowDriverInvite] = useState(false);
-  const inviteTimerRef = React.useRef<any>(null);
-
-  useEffect(() => {
-    if (activeTab === 'usuario') {
-      setShowDriverInvite(true);
-      if (inviteTimerRef.current) {
-        clearTimeout(inviteTimerRef.current);
-      }
-      inviteTimerRef.current = setTimeout(() => {
-        setShowDriverInvite(false);
-      }, 5000);
-    } else {
-      setShowDriverInvite(false);
+  const [showDriverInvite, setShowDriverInvite] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('ruedas_dismiss_driver_invite') !== 'true';
+    } catch {
+      return true;
     }
-    return () => {
-      if (inviteTimerRef.current) {
-        clearTimeout(inviteTimerRef.current);
-      }
-    };
-  }, [activeTab]);
+  });
+
+  const handleDismissDriverInvite = (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setShowDriverInvite(false);
+    try {
+      localStorage.setItem('ruedas_dismiss_driver_invite', 'true');
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   const [adminSubTab, setAdminSubTab] = useState<'resumen' | 'recargas' | 'conductores' | 'usuarios' | 'espera' | 'alertas' | 'soporte' | 'historial' | 'ranking' | 'aliados' | 'activacion'>('resumen');
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
   const [allUsers, setAllUsers] = useState<any[]>([]);
@@ -2836,6 +2833,11 @@ export default function App() {
         toast.info("Inicio de sesión cancelado.");
       } else if (error.code === 'auth/popup-blocked') {
         toast.error("El navegador bloqueó la ventana emergente. Por favor, permite las ventanas emergentes para este sitio.");
+      } else if (error.code === 'auth/internal-error' || (error.message && error.message.includes('internal-error'))) {
+        toast.error(
+          "No fue posible autenticar con Google en este entorno. Puedes ingresar rápidamente con tu número celular o abrir la app en una nueva pestaña.",
+          { duration: 8000 }
+        );
       } else {
         console.error("Error al iniciar sesión", error);
         toast.error(
@@ -2873,6 +2875,8 @@ export default function App() {
           "El proveedor de Correo/Contraseña no está habilitado en tu consola de Firebase. Actívalo en: Firebase Console > Authentication > Sign-in method.",
           { duration: 10000 }
         );
+      } else if (error.code === 'auth/internal-error' || (error.message && error.message.includes('internal-error'))) {
+        toast.error("Error interno de autenticación. Te sugerimos ingresar usando tu número celular.", { duration: 8000 });
       } else {
         toast.error(`Error: ${error.message || error}`);
       }
@@ -3110,12 +3114,16 @@ export default function App() {
       console.error("Error registering with email/password", error);
       if (error.code === 'auth/email-already-in-use') {
         toast.error("Este correo ya está registrado.");
+      } else if (error.code === 'auth/weak-password') {
+        toast.error("La contraseña es muy débil. Debe tener al menos 6 caracteres.");
       } else if (error.code === 'auth/operation-not-allowed') {
         setAuthError('operation-not-allowed');
         toast.error(
           "El proveedor de Correo/Contraseña no está habilitado en tu consola de Firebase. Actívalo en: Firebase Console > Authentication > Sign-in method.",
           { duration: 10000 }
         );
+      } else if (error.code === 'auth/internal-error' || (error.message && error.message.includes('internal-error'))) {
+        toast.error("Error interno del servicio de autenticación. Te sugerimos registrarte mediante tu número celular.", { duration: 8000 });
       } else {
         toast.error(`Error de registro: ${error.message || error}`);
       }
@@ -4823,63 +4831,74 @@ export default function App() {
                     <AnimatePresence>
                       {!conductor && showDriverInvite && (
                         <motion.div 
-                          initial={{ opacity: 0, height: 0, y: -20, scale: 0.95 }}
-                          animate={{ opacity: 1, height: "auto", y: 0, scale: 1 }}
-                          exit={{ opacity: 0, height: 0, y: -20, scale: 0.95 }}
-                          transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-                          whileHover={{ scale: 1.01, translateY: -1 }}
-                          className="group relative overflow-hidden rounded-[2.5rem] bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-950 p-6 text-white shadow-2xl border border-emerald-500/20 text-left"
+                          initial={{ opacity: 0, y: -6, scale: 0.99 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          exit={{ opacity: 0, height: 0, marginTop: 0, marginBottom: 0, padding: 0, overflow: 'hidden' }}
+                          transition={{ duration: 0.25, ease: "easeOut" }}
+                          className="relative overflow-hidden rounded-2xl bg-slate-900 text-white p-4 shadow-sm border border-slate-800 text-left"
                         >
-                          {/* Progress Timer bar (5 seconds) */}
-                          <div className="absolute top-0 left-0 right-0 h-[3px] bg-slate-800/40 overflow-hidden">
-                            <motion.div 
-                              initial={{ width: "100%" }}
-                              animate={{ width: "0%" }}
-                              transition={{ duration: 5, ease: "linear" }}
-                              className="h-full bg-gradient-to-r from-emerald-400 via-teal-400 to-indigo-400 shadow-[0_0_8px_rgba(52,211,153,0.5)]"
-                            />
-                          </div>
-
-                          {/* Close button */}
-                          <button 
-                            onClick={() => setShowDriverInvite(false)}
-                            className="absolute top-4 right-4 text-slate-400 hover:text-white bg-slate-800/40 hover:bg-slate-800/80 p-1.5 rounded-full transition-all cursor-pointer border border-slate-700/50 hover:scale-105 active:scale-95 z-20"
-                          >
-                            <X size={12} />
-                          </button>
-
-                          {/* Glowing ambient blobs */}
-                          <div className="absolute -right-10 -bottom-10 w-28 h-28 bg-emerald-500/15 rounded-full blur-2xl group-hover:bg-emerald-500/25 transition-all duration-500" />
-                          <div className="absolute -left-10 -top-10 w-28 h-28 bg-indigo-500/15 rounded-full blur-2xl group-hover:bg-indigo-500/25 transition-all duration-500" />
-                          
-                          <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-5">
-                            <div className="space-y-2">
-                              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-300">
-                                <Coins size={11} className="animate-pulse" />
-                                <span className="text-[8px] font-black uppercase tracking-widest">Ingresos Adicionales</span>
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <div className="flex items-start sm:items-center gap-3 min-w-0">
+                              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0">
+                                <Car size={20} />
                               </div>
-                              <h4 className="text-sm font-black tracking-tight text-white flex items-center gap-2">
-                                ¿Quieres conducir con nosotros?
-                              </h4>
-                              <p className="text-[10.5px] text-slate-400 leading-relaxed font-medium max-w-[320px]">
-                                Genera excelentes ingresos extras en tu tiempo libre. Tú decides tus horarios con total libertad y seguridad.
-                              </p>
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <h5 className="text-xs font-black text-white tracking-tight">
+                                    ¿Deseas generar ingresos conduciendo?
+                                  </h5>
+                                  <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">
+                                    85% Neto
+                                  </span>
+                                </div>
+                                <p className="text-[11px] text-slate-400 font-medium leading-tight mt-0.5">
+                                  Registra tu moto, taxi o carro y recibe solicitudes de viajes con horarios 100% flexibles.
+                                </p>
+                              </div>
                             </div>
-                            
-                            <button
-                              onClick={() => {
-                                setShowDriverRegModal(true);
-                                setShowDriverInvite(false);
-                              }}
-                              className="w-full sm:w-auto px-5 py-3.5 bg-gradient-to-r from-emerald-400 to-emerald-500 hover:from-emerald-300 hover:to-emerald-400 text-slate-950 rounded-2xl font-black text-[10.5px] uppercase tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md shadow-emerald-500/10 hover:shadow-emerald-500/20 active:scale-95 shrink-0"
-                            >
-                              <span>Comenzar Registro</span>
-                              <ChevronRight size={13} className="group-hover:translate-x-1 transition-transform stroke-[3]" />
-                            </button>
+
+                            <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                              <button
+                                onClick={() => {
+                                  setShowDriverRegModal(true);
+                                }}
+                                className="px-3.5 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-xl font-bold text-[11px] uppercase tracking-wider transition-all cursor-pointer shadow-sm active:scale-95 flex items-center gap-1.5 whitespace-nowrap"
+                              >
+                                <span>Quiero Ser Conductor</span>
+                                <ChevronRight size={13} className="stroke-[3]" />
+                              </button>
+                              <button 
+                                onClick={handleDismissDriverInvite}
+                                title="Cerrar invitación"
+                                aria-label="Cerrar invitación"
+                                className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-white bg-slate-800/80 hover:bg-slate-700 rounded-xl transition-all cursor-pointer border border-slate-700/40"
+                              >
+                                <X size={14} />
+                              </button>
+                            </div>
                           </div>
                         </motion.div>
                       )}
                     </AnimatePresence>
+
+                    {!conductor && !showDriverInvite && (
+                      <div className="flex justify-end -mt-2">
+                        <button
+                          onClick={() => {
+                            setShowDriverInvite(true);
+                            try {
+                              localStorage.removeItem('ruedas_dismiss_driver_invite');
+                            } catch (e) {
+                              console.error(e);
+                            }
+                          }}
+                          className="text-[10px] text-slate-400 hover:text-emerald-600 font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                        >
+                          <Car size={12} />
+                          <span>¿Quieres conducir con nosotros? Postúlate aquí</span>
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                   {/* Active Trips (Mis Solicitudes) - Moved here for better visibility */}
@@ -6683,12 +6702,18 @@ export default function App() {
                                     </div>
                                   </div>
 
-                                  {/* Precio / Acción */}
+                                  {/* Precio / Acción con desglose 15% */}
                                   <div className="flex sm:flex-col items-baseline sm:items-end justify-between sm:justify-center gap-2 border-t sm:border-t-0 pt-3 sm:pt-0 border-slate-100 shrink-0">
                                     <div className="text-left sm:text-right">
-                                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider leading-none mb-1">Valor Sugerido</p>
+                                      <div className="flex items-center gap-1.5 justify-start sm:justify-end mb-0.5">
+                                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider leading-none">Tarifa sugerida</p>
+                                        <span className="text-[8px] font-black bg-rose-100 text-rose-700 px-1 py-0.2 rounded leading-none">Com. 15%</span>
+                                      </div>
                                       <p className="text-lg font-black text-emerald-600 bg-emerald-50/60 border border-emerald-100/50 px-3 py-1 rounded-xl">
                                         ${viaje.valor.toLocaleString()}
+                                      </p>
+                                      <p className="text-[9px] text-slate-500 font-bold mt-1">
+                                        Ganancia neta (85%): <span className="text-emerald-700 font-black">${Math.round(viaje.valor * 0.85).toLocaleString()}</span>
                                       </p>
                                     </div>
                                     
@@ -6702,7 +6727,7 @@ export default function App() {
                                             }
                                             handleContraoferta(viaje);
                                           }}
-                                          className="bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold px-5 py-2.5 rounded-xl shadow-md hover:shadow-lg transition-all active:scale-95 uppercase tracking-wider"
+                                          className="bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold px-5 py-2.5 rounded-xl shadow-md hover:shadow-lg transition-all active:scale-95 uppercase tracking-wider cursor-pointer"
                                         >
                                           ENVIAR OFERTA
                                         </button>
@@ -10001,7 +10026,7 @@ export default function App() {
                            </div>
                            <div>
                              <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Seguridad Garantizada</p>
-                             <p className="text-[9px] text-emerald-500 font-medium">Recuerda que se aplica una comisión del 8% sobre el valor total.</p>
+                             <p className="text-[9px] text-emerald-500 font-medium">Recuerda que se aplica una comisión del 15% sobre el valor total.</p>
                            </div>
                         </div>
 
@@ -10991,6 +11016,26 @@ export default function App() {
                           )}
                         </button>
                       </div>
+
+                      {!conductor && (
+                        <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
+                          <div className="text-left">
+                            <p className="text-[11px] font-bold text-slate-800">¿Quieres ser conductor?</p>
+                            <p className="text-[9px] text-slate-400">Postula tu vehículo y genera ingresos</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowProfileModal(false);
+                              setShowDriverRegModal(true);
+                            }}
+                            className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-[10px] rounded-xl transition-all cursor-pointer flex items-center gap-1 active:scale-95"
+                          >
+                            <span>Postularme</span>
+                            <ChevronRight size={12} />
+                          </button>
+                        </div>
+                      )}
                     </form>
                   </motion.div>
                 </motion.div>
@@ -12865,7 +12910,7 @@ export default function App() {
                         <div className="mt-4 bg-rose-500/10 border border-rose-500/20 p-3.5 rounded-[1.5rem] flex items-start gap-2.5">
                           <AlertTriangle size={14} className="text-rose-400 flex-shrink-0 mt-0.5 animate-pulse" />
                           <p className="text-[10px] text-rose-200 leading-relaxed font-medium">
-                            El descuento de la comisión de <strong className="text-white font-black">8%</strong> se realiza automáticamente cuando el usuario acepta el servicio. Si se realiza una cancelación por cualquier panel, el descuento se mantendrá aplicado <strong className="text-white font-black">sin reembolso</strong>.
+                            El descuento de la comisión del <strong className="text-white font-black">15%</strong> se realiza automáticamente de tu Tarjeta Virtual cuando el usuario acepta el servicio. Si se realiza una cancelación por cualquier panel, el descuento se mantendrá aplicado <strong className="text-white font-black">sin reembolso</strong>.
                           </p>
                         </div>
                       </div>

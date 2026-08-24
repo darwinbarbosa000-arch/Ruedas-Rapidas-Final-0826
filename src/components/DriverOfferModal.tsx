@@ -11,7 +11,7 @@ export interface DriverOfferModalProps {
 export default function DriverOfferModal({ service, onClose, onSendOffer, driverBalance, onRequestRecharge }: DriverOfferModalProps) {
   const basePrice = service?.valor || service?.basePrice || 5000;
   const currencySymbol = service?.currencySymbol || '$';
-  const commissionRate = 0.08; // 8%
+  const commissionRate = 0.15; // 15% de comisión estándar
   
   const [selectedPrice, setSelectedPrice] = useState(basePrice + 2000);
   const [selectedTime, setSelectedTime] = useState(5);
@@ -25,127 +25,147 @@ export default function DriverOfferModal({ service, onClose, onSendOffer, driver
   
   const times = [3, 5, 8, 10, 15];
   const commission = Math.round(selectedPrice * commissionRate);
-  const totalToCollect = selectedPrice; // 100% para el conductor
+  const netEarnings = selectedPrice - commission; // 85% para el conductor
+  const totalToCollect = selectedPrice; // 100% que paga el usuario
   const currentBalance = driverBalance !== undefined ? driverBalance : 133000;
   const hasEnoughBalance = currentBalance >= commission;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-[110] p-0 sm:p-4">
-      <div className="bg-white w-full sm:w-[420px] rounded-t-3xl sm:rounded-2xl p-4 pb-6 max-h-[90vh] overflow-y-auto shadow-2xl relative animate-in fade-in slide-in-from-bottom duration-200">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-end sm:items-center justify-center z-[110] p-0 sm:p-4 animate-in fade-in duration-200">
+      <div className="bg-white w-full sm:w-[440px] rounded-t-3xl sm:rounded-3xl p-5 pb-6 max-h-[92vh] overflow-y-auto shadow-2xl relative animate-in fade-in slide-in-from-bottom duration-200 border border-slate-100">
         
         {/* HEADER */}
-        <div className="flex justify-between items-center mb-4 pb-2 border-b border-gray-100">
+        <div className="flex justify-between items-center mb-4 pb-3 border-b border-slate-100">
           <div>
-            <p className="text-sm text-gray-500 font-medium">Tarifa del pasajero</p>
-            <p className="text-2xl font-bold text-gray-900">{currencySymbol} {basePrice.toLocaleString()} COP</p>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-md">
+                Comisión 15%
+              </span>
+              <p className="text-xs text-slate-500 font-medium">Tarifa del pasajero</p>
+            </div>
+            <p className="text-2xl font-black text-slate-900 mt-0.5">{currencySymbol} {basePrice.toLocaleString()} <span className="text-xs font-bold text-slate-400">COP</span></p>
           </div>
           <button 
             type="button"
             onClick={onClose} 
-            className="text-gray-400 hover:text-gray-600 text-2xl font-light w-9 h-9 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors cursor-pointer"
+            className="text-slate-400 hover:text-slate-700 text-2xl font-light w-9 h-9 flex items-center justify-center rounded-full hover:bg-slate-100 transition-colors cursor-pointer"
+            aria-label="Cerrar modal de oferta"
           >
             ×
           </button>
         </div>
 
         {/* SECCIÓN 1: AJUSTA TU PRECIO */}
-        <div className="mb-5">
-          <p className="text-sm font-semibold mb-2 text-gray-800">¿Cuánto ofreces?</p>
+        <div className="mb-4">
+          <p className="text-xs font-bold uppercase tracking-wider mb-2 text-slate-700">¿Cuánto ofreces al pasajero?</p>
           <div className="grid grid-cols-4 gap-2 mb-3">
             {quickPrices.map(p => (
               <button 
                 type="button"
                 key={p.label + p.value}
                 onClick={() => setSelectedPrice(p.value)}
-                className={`p-2 rounded-xl border-2 text-center transition-all cursor-pointer ${
+                className={`p-2.5 rounded-xl border-2 text-center transition-all cursor-pointer ${
                   selectedPrice === p.value 
-                  ? 'border-green-500 bg-green-50 text-green-900' 
-                  : 'border-gray-200 bg-white hover:bg-gray-50 text-gray-700'
+                  ? 'border-emerald-500 bg-emerald-50 text-emerald-900 shadow-xs' 
+                  : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700'
                 }`}
               >
-                <p className="text-[11px] text-gray-500 font-medium">{p.label}</p>
-                <p className="font-bold text-sm">{currencySymbol} {p.value.toLocaleString()}</p>
+                <p className="text-[10px] text-slate-500 font-bold uppercase">{p.label}</p>
+                <p className="font-black text-sm">{currencySymbol} {p.value.toLocaleString()}</p>
               </button>
             ))}
           </div>
           
           {/* INPUT PERSONALIZADO */}
           <div className="relative">
-            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-bold text-green-600 select-none">{currencySymbol}</span>
+            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-black text-emerald-600 select-none">{currencySymbol}</span>
             <input 
               type="number"
               step="500"
-              min="5000"
+              min="4000"
               value={selectedPrice || ''}
               onChange={(e) => setSelectedPrice(Number(e.target.value) || 0)}
-              className="w-full pl-10 pr-4 py-3.5 border-2 border-gray-200 rounded-xl text-2xl font-bold focus:border-green-500 outline-none text-gray-900 bg-white"
+              placeholder="Ingresa tu tarifa"
+              className="w-full pl-10 pr-4 py-3.5 border-2 border-slate-200 focus:border-emerald-500 rounded-2xl text-2xl font-black outline-none text-slate-900 bg-slate-50/50 focus:bg-white transition-all"
             />
           </div>
         </div>
 
         {/* SECCIÓN 2: TIEMPO DE LLEGADA */}
-        <div className="mb-5">
-          <p className="text-sm font-semibold mb-2 text-gray-800">¿En cuántos minutos llegas?</p>
+        <div className="mb-4">
+          <p className="text-xs font-bold uppercase tracking-wider mb-2 text-slate-700">¿En cuántos minutos llegas?</p>
           <div className="flex gap-2 justify-between">
             {times.map(t => (
               <button 
                 type="button"
                 key={t}
                 onClick={() => setSelectedTime(t)}
-                className={`flex-1 py-2 rounded-xl border-2 transition-all cursor-pointer ${
+                className={`flex-1 py-2.5 rounded-xl border-2 transition-all cursor-pointer ${
                   selectedTime === t 
-                  ? 'bg-black text-white border-black font-bold' 
-                  : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
+                  ? 'bg-slate-900 text-white border-slate-900 font-black shadow-md' 
+                  : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
                 }`}
               >
-                <p className="font-bold text-lg leading-tight">{t}</p>
-                <p className="text-[10px] uppercase font-bold tracking-wider">MIN</p>
+                <p className="font-black text-base leading-tight">{t}</p>
+                <p className="text-[9px] uppercase font-bold tracking-wider">MIN</p>
               </button>
             ))}
           </div>
         </div>
 
-        {/* UI NUEVA - RESUMEN DE PAGO */}
-        <div className="bg-gray-50 rounded-xl p-4 mb-4 space-y-2">
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-gray-600">El pasajero te paga en efectivo</span>
-            <span className="font-bold text-lg text-black">{currencySymbol} {totalToCollect.toLocaleString()} COP</span>
+        {/* UI DESGLOSE DE COMISIÓN (15%) Y GANANCIA NETA */}
+        <div className="bg-slate-50/80 border border-slate-200/80 rounded-2xl p-4 mb-4 space-y-2.5">
+          <div className="flex justify-between items-center text-xs">
+            <span className="text-slate-600 font-medium">Cobro total al pasajero:</span>
+            <span className="font-black text-base text-slate-900">{currencySymbol} {totalToCollect.toLocaleString()} COP</span>
           </div>
           
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-gray-600">Comisión Ruedas Rápidas 8%</span>
-            <span className="text-sm text-red-500 font-semibold">- {currencySymbol} {commission.toLocaleString()} COP</span>
+          <div className="flex justify-between items-center text-xs">
+            <div className="flex items-center gap-1.5">
+              <span className="text-slate-600 font-medium">Comisión de plataforma</span>
+              <span className="text-[9px] font-black bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded">15%</span>
+            </div>
+            <span className="text-sm text-rose-600 font-black">- {currencySymbol} {commission.toLocaleString()} COP</span>
           </div>
 
-          <div className="border-t border-gray-200 pt-2 mt-2">
-            <div className="flex justify-between items-center">
-              <span className="text-xs text-gray-500">Se cobrará de tu saldo al aceptar</span>
-              <span className="text-xs text-red-600 font-bold">{currencySymbol} {commission.toLocaleString()} COP</span>
+          <div className="border-t border-slate-200/80 pt-2.5 mt-1 flex justify-between items-center">
+            <div>
+              <span className="text-xs font-bold text-slate-800">Tu ganancia neta estimada:</span>
+              <p className="text-[10px] text-slate-400 font-medium">85% libre para el conductor</p>
             </div>
+            <span className="text-base text-emerald-600 font-black">{currencySymbol} {netEarnings.toLocaleString()} COP</span>
           </div>
         </div>
 
         {/* MENSAJE DE ADVERTENCIA */}
-        <div className="bg-yellow-50 border border-yellow-300 rounded-lg p-2 mb-4">
-          <p className="text-xs text-yellow-800">
-            ⚠️ Recibirás {currencySymbol}{selectedPrice.toLocaleString()} en efectivo. 
-            La comisión de {currencySymbol}{commission.toLocaleString()} se descontará de tu saldo ahora.
+        <div className="bg-amber-50/90 border border-amber-200/90 rounded-xl p-3 mb-4 flex items-start gap-2.5">
+          <span className="text-sm">💡</span>
+          <p className="text-[11px] text-amber-900 leading-snug font-medium">
+            Recibirás <strong className="font-bold text-amber-950">{currencySymbol}{selectedPrice.toLocaleString()} COP</strong> directamente del usuario. 
+            La comisión del <strong className="font-bold text-amber-950">15% ({currencySymbol}{commission.toLocaleString()} COP)</strong> se descontará automáticamente de tu Tarjeta Virtual una vez el usuario acepte el servicio.
           </p>
         </div>
 
-        {/* SALDO */}
-        <div className="flex items-center justify-between gap-2 bg-green-50 text-green-800 border border-green-200 rounded-xl p-3 mb-4 text-sm font-medium">
+        {/* ESTADO DEL SALDO EN TARJETA VIRTUAL */}
+        <div className={`flex items-center justify-between gap-2 border rounded-2xl p-3.5 mb-4 text-xs font-medium transition-all ${
+          hasEnoughBalance 
+          ? 'bg-emerald-50 text-emerald-900 border-emerald-200' 
+          : 'bg-rose-50 text-rose-900 border-rose-200'
+        }`}>
           <div className="flex items-center gap-2">
-            <span className="text-base">🛡️</span>
-            <span>Saldo disponible: {currencySymbol} {currentBalance.toLocaleString()} COP</span>
+            <span className="text-base">{hasEnoughBalance ? '🛡️' : '⚠️'}</span>
+            <div>
+              <p className="text-[10px] uppercase font-bold text-slate-500">Saldo disponible en Tarjeta Virtual</p>
+              <p className="font-black text-sm">{currencySymbol} {currentBalance.toLocaleString()} COP</p>
+            </div>
           </div>
           {!hasEnoughBalance && onRequestRecharge && (
             <button 
               type="button" 
               onClick={onRequestRecharge}
-              className="text-xs bg-red-600 hover:bg-red-700 text-white font-bold px-3 py-1 rounded-lg transition-colors shadow-xs"
+              className="text-xs bg-rose-600 hover:bg-rose-700 text-white font-black px-3.5 py-1.5 rounded-xl transition-all shadow-sm active:scale-95"
             >
-              Recargar
+              Recargar Saldo
             </button>
           )}
         </div>
@@ -154,11 +174,11 @@ export default function DriverOfferModal({ service, onClose, onSendOffer, driver
         <button 
           type="button"
           onClick={() => onSendOffer(selectedPrice, selectedTime)}
-          disabled={!hasEnoughBalance || selectedPrice < 5000}
-          className={`w-full font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer ${
-            !hasEnoughBalance || selectedPrice < 5000
-            ? 'bg-gray-200 text-gray-400 cursor-not-allowed shadow-none'
-            : 'bg-green-500 hover:bg-green-600 active:scale-[0.99] text-white shadow-lg shadow-green-200'
+          disabled={!hasEnoughBalance || selectedPrice < 4000}
+          className={`w-full font-black text-xs uppercase tracking-wider py-4 rounded-2xl flex items-center justify-center gap-2 transition-all cursor-pointer shadow-lg ${
+            !hasEnoughBalance || selectedPrice < 4000
+            ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
+            : 'bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white shadow-emerald-200 hover:shadow-emerald-300'
           }`}
         >
           ✓ ENVIAR OFERTA POR {currencySymbol} {selectedPrice.toLocaleString()} ({selectedTime} MIN)

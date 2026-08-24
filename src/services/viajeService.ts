@@ -134,11 +134,11 @@ export async function crearPerfilUsuario(userId: string, datos: any) {
 
 /**
  * Acepta un viaje directamente desde el modo conductor (sin oferta previa).
- * Verifica que el conductor tenga saldo suficiente para la comisión.
+ * Verifica que el conductor tenga saldo suficiente para la comisión (15%).
  * Se asume un tiempo por defecto o se puede pasar como parámetro.
  */
 export async function aceptarViaje(viajeId: string, conductorId: string, conductorNombre: string, conductorTelefono: string, conductorPlaca: string, conductorColor: string, valor: number, tiempoLlegada: number = 5) {
-  const comision = valor * 0.08;
+  const comision = Math.round(valor * 0.15);
   const conductorRef = doc(db, 'conductores', conductorId);
   const viajeRef = doc(db, 'viajes', viajeId);
   const transaccionesRef = collection(db, 'transacciones');
@@ -160,7 +160,7 @@ export async function aceptarViaje(viajeId: string, conductorId: string, conduct
 
       const saldoActual = conductorDoc.data().tarjeta_virtual || 0;
       if (saldoActual < comision) {
-        throw new Error('Saldo insuficiente en Tarjeta Virtual para aceptar este viaje. El mínimo requerido es el 8% del valor del servicio.');
+        throw new Error('Saldo insuficiente en Tarjeta Virtual para aceptar este viaje. El mínimo requerido es el 15% del valor del servicio ($' + comision.toLocaleString() + ' COP).');
       }
 
       // 1. Actualizar estado del viaje
@@ -275,7 +275,7 @@ export async function ofertarViaje(
 
 /**
  * Finaliza un viaje, descuenta el valor del saldo promocional del usuario y
- * descuenta la comisión del 8% de la tarjeta virtual del conductor.
+ * liquida la comisión del 15% si no estaba calculada.
  */
 export async function finalizarViaje(viajeId: string, usuarioId: string, valor: number) {
   const userRef = doc(db, 'usuarios', usuarioId);
@@ -305,7 +305,7 @@ export async function finalizarViaje(viajeId: string, usuarioId: string, valor: 
       }
 
       // 2. TODAS LAS ESCRITURAS DESPUÉS
-      const comision = viajeData.comision || (valor * 0.08);
+      const comision = viajeData.comision || Math.round(valor * 0.15);
       const saldoPromoActual = userDoc.data().saldo_promo || 0;
       const descuento = Math.min(saldoPromoActual, valor);
 
@@ -515,7 +515,7 @@ export async function toggleEstadoConductor(conductorId: string, nuevoEstado: bo
 
 /**
  * Permite que el conductor cancele un viaje después de haberlo aceptado.
- * Según las reglas de negocio, NO hay reembolso de la comisión si el conductor cancela.
+ * Según las reglas de negocio, NO hay reembolso de la comisión del 15% si el conductor cancela.
  */
 export async function cancelarViajeConductor(viajeId: string, conductorId: string) {
   const viajeRef = doc(db, 'viajes', viajeId);
@@ -775,7 +775,7 @@ export async function cancelarViajeUsuario(viajeId: string, usuarioId: string) {
         actualizado_en: serverTimestamp()
       });
 
-      // Liberar al conductor si ya estaba asignado (el 8% queda cobrado, sin reembolso)
+      // Liberar al conductor si ya estaba asignado (el 15% queda cobrado, sin reembolso)
       const conductorId = viajeDoc.data().conductorId;
       if (conductorId) {
         const conductorRef = doc(db, 'conductores', conductorId);
@@ -975,7 +975,7 @@ export async function crearViajeExpreso(conductorId: string, datos: any) {
 
 /**
  * Reserva uno o más cupos en un viaje expreso.
- * Se descuenta automáticamente una comisión del 8% de la tarjeta virtual del conductor.
+ * Se descuenta automáticamente una comisión del 15% de la tarjeta virtual del conductor.
  */
 export async function reservarCupoExpreso(viajeId: string, usuarioId: string, usuarioNombre: string, cuposReservar: number, usuarioTelefono: string) {
   const viajeRef = doc(db, 'expreso_viajes', viajeId);
@@ -1002,13 +1002,13 @@ export async function reservarCupoExpreso(viajeId: string, usuarioId: string, us
       
       if (!conductorDoc.exists()) throw new Error('El conductor ya no está disponible');
 
-      // Calcular comisión (8% de la reserva)
+      // Calcular comisión (15% de la reserva)
       const valorReserva = (data.valorPorCupo || 0) * cuposReservar;
-      const comision = valorReserva * 0.08;
+      const comision = Math.round(valorReserva * 0.15);
       const saldoConductor = conductorDoc.data().tarjeta_virtual || 0;
 
       if (saldoConductor < comision) {
-        throw new Error('El conductor no cuenta con saldo suficiente en su Tarjeta Virtual para procesar la comisión de esta reserva (8%).');
+        throw new Error('El conductor no cuenta con saldo suficiente en su Tarjeta Virtual para procesar la comisión de esta reserva (15% = $' + comision.toLocaleString() + ' COP).');
       }
 
       const pasajeros = data.pasajeros || {};
