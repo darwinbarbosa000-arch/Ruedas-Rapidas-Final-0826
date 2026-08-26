@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { doc, onSnapshot } from 'firebase/firestore';
-import { MapComponent } from './MapComponent';
+import { MapComponent, isValidPos, calculateHaversineKm } from './MapComponent';
 
 const FUSAGASUGA_CENTER = { lat: 4.3364, lng: -74.3638 };
 
@@ -18,17 +18,6 @@ interface RideTrackerProps {
   passengerPoint?: RidePoint | null;
   destinationPoint?: RidePoint | null;
 }
-
-const isValidPos = (pos: any): boolean => {
-  return (
-    pos !== null &&
-    pos !== undefined &&
-    typeof pos.lat === 'number' &&
-    typeof pos.lng === 'number' &&
-    !isNaN(pos.lat) &&
-    !isNaN(pos.lng)
-  );
-};
 
 export const RideTracker: React.FC<RideTrackerProps> = ({
   driverId,
@@ -56,13 +45,17 @@ export const RideTracker: React.FC<RideTrackerProps> = ({
             if (isValidPos({ lat, lng })) {
               const newDriverPos = { lat, lng };
               setDriverLocation(newDriverPos);
-              setLastUpdated(data.timestamp ? new Date(data.timestamp).toLocaleTimeString('es-CO') : new Date().toLocaleTimeString('es-CO'));
+              setLastUpdated(
+                data.timestamp
+                  ? new Date(data.timestamp).toLocaleTimeString('es-CO')
+                  : new Date().toLocaleTimeString('es-CO')
+              );
             }
           }
         }
       },
       (err) => {
-        console.error('Error al escuchar ubicación de conductor:', err);
+        console.warn('Notice listening to driver location:', err);
       }
     );
 
@@ -78,37 +71,38 @@ export const RideTracker: React.FC<RideTrackerProps> = ({
   let etaMins = 0;
   let distKm = 0;
 
-  if (isValidPos(driverLocation) && typeof targetLat === 'number' && typeof targetLng === 'number' && !isNaN(targetLat) && !isNaN(targetLng)) {
-    const R = 6371; // km
-    const dLat = (targetLat - driverLocation!.lat) * (Math.PI / 180);
-    const dLon = (targetLng - driverLocation!.lng) * (Math.PI / 180);
-    const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos(driverLocation!.lat * (Math.PI / 180)) * Math.cos(targetLat * (Math.PI / 180)) *
-      Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    const distRaw = R * c;
-    distKm = Math.round((distRaw > 0 ? distRaw : 0.5) * 10) / 10;
-    etaMins = Math.max(1, Math.round((distKm / 20) * 60));
+  if (
+    isValidPos(driverLocation) &&
+    typeof targetLat === 'number' &&
+    typeof targetLng === 'number' &&
+    !isNaN(targetLat) &&
+    !isNaN(targetLng)
+  ) {
+    distKm = calculateHaversineKm(driverLocation, { lat: targetLat, lng: targetLng });
+    // Estimar tiempo con velocidad promedio urbana de 26 km/h
+    etaMins = Math.max(1, Math.round((distKm / 26) * 60));
   } else {
-    distKm = 1.2;
+    distKm = 1.0;
     etaMins = 3;
   }
 
   // Determinar centro por defecto del mapa
-  const mapCenter = isValidPos(driverLocation) && driverLocation
-    ? driverLocation
-    : passengerPoint && typeof passengerPoint.lat === 'number' && typeof passengerPoint.lng === 'number'
-    ? { lat: passengerPoint.lat, lng: passengerPoint.lng }
-    : FUSAGASUGA_CENTER;
+  const mapCenter =
+    isValidPos(driverLocation) && driverLocation
+      ? driverLocation
+      : passengerPoint && typeof passengerPoint.lat === 'number' && typeof passengerPoint.lng === 'number'
+      ? { lat: passengerPoint.lat, lng: passengerPoint.lng }
+      : FUSAGASUGA_CENTER;
 
-  const validOrigen = passengerPoint && typeof passengerPoint.lat === 'number' && typeof passengerPoint.lng === 'number'
-    ? { lat: passengerPoint.lat, lng: passengerPoint.lng, address: passengerPoint.address }
-    : null;
+  const validOrigen =
+    passengerPoint && typeof passengerPoint.lat === 'number' && typeof passengerPoint.lng === 'number'
+      ? { lat: passengerPoint.lat, lng: passengerPoint.lng, address: passengerPoint.address }
+      : null;
 
-  const validDestino = destinationPoint && typeof destinationPoint.lat === 'number' && typeof destinationPoint.lng === 'number'
-    ? { lat: destinationPoint.lat, lng: destinationPoint.lng, address: destinationPoint.address }
-    : null;
+  const validDestino =
+    destinationPoint && typeof destinationPoint.lat === 'number' && typeof destinationPoint.lng === 'number'
+      ? { lat: destinationPoint.lat, lng: destinationPoint.lng, address: destinationPoint.address }
+      : null;
 
   return (
     <div className="w-full space-y-3 notranslate" translate="no">
@@ -121,7 +115,8 @@ export const RideTracker: React.FC<RideTrackerProps> = ({
               <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
             </span>
             <span className="font-extrabold text-xs tracking-tight text-emerald-400 truncate">
-              {driverName ? `Conductor ${driverName}` : 'Conductor'} {isEnTransito ? 'en trayecto a tu destino' : 'en camino a tu ubicación'}
+              {driverName ? `Conductor ${driverName}` : 'Conductor'}{' '}
+              {isEnTransito ? 'en trayecto a tu destino' : 'en camino a tu ubicación'}
             </span>
           </div>
           <span className="text-[9px] font-mono text-emerald-300 bg-emerald-950/80 px-2 py-0.5 rounded-md border border-emerald-500/30 shrink-0">
@@ -136,7 +131,9 @@ export const RideTracker: React.FC<RideTrackerProps> = ({
               ⏱️
             </div>
             <div className="min-w-0">
-              <span className="text-[9px] font-black uppercase text-emerald-300 tracking-wider block leading-none">Llegada Est.</span>
+              <span className="text-[9px] font-black uppercase text-emerald-300 tracking-wider block leading-none">
+                Llegada Est.
+              </span>
               <p className="text-sm sm:text-base font-black text-white font-mono leading-tight mt-0.5">
                 ~{etaMins} <span className="text-[10px] font-sans font-bold text-emerald-300">min</span>
               </p>
@@ -162,11 +159,11 @@ export const RideTracker: React.FC<RideTrackerProps> = ({
       {/* Alerta si falta ubicación GPS del conductor */}
       {!driverLocation && (
         <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs p-3 rounded-2xl flex items-center gap-2">
-          <span>📡 Esperando señal GPS del conductor en tiempo real...</span>
+          <span>📡 Conectando con la señal GPS del vehículo...</span>
         </div>
       )}
 
-      {/* Componente de mapa unificado con mayor área de visualización */}
+      {/* Componente de mapa unificado con soporte OpenStreetMap */}
       <MapComponent
         center={mapCenter}
         zoom={14}
@@ -176,7 +173,7 @@ export const RideTracker: React.FC<RideTrackerProps> = ({
         driverName={driverName}
         vehicleType={vehicleType}
         showRoute={true}
-        className="w-full h-[380px] sm:h-[430px] rounded-2xl overflow-hidden shadow-lg border border-slate-200 relative"
+        className="w-full h-[380px] sm:h-[430px] rounded-3xl overflow-hidden shadow-lg border border-slate-200 relative"
       />
     </div>
   );

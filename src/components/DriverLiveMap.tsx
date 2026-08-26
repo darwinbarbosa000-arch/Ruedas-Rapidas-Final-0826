@@ -1,58 +1,65 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { db } from '../firebase';
 import { doc, setDoc, onSnapshot } from 'firebase/firestore';
-import { MapComponent } from './MapComponent';
+import { MapComponent, isValidPos, calculateHaversineKm } from './MapComponent';
 
 const FUSAGASUGA_CENTER = { lat: 4.3364, lng: -74.3638 };
 
 interface DriverLiveMapProps {
   driverId: string;
   driverName?: string;
+  vehicleType?: string;
   isOnline?: boolean;
   origen?: { lat: number; lng: number; address?: string } | null;
   destino?: { lat: number; lng: number; address?: string } | null;
   showRoute?: boolean;
 }
 
-const isValidPos = (pos: any): pos is { lat: number; lng: number } => {
-  return (
-    pos !== null &&
-    pos !== undefined &&
-    typeof pos.lat === 'number' &&
-    typeof pos.lng === 'number' &&
-    !isNaN(pos.lat) &&
-    !isNaN(pos.lng)
-  );
-};
-
 export const DriverLiveMap: React.FC<DriverLiveMapProps> = ({
   driverId,
   driverName = 'Conductor',
+  vehicleType = 'carro',
   isOnline = true,
   origen = null,
   destino = null,
   showRoute = false,
 }) => {
-  // Inicializar con Fusagasugá como centro regional predeterminado (Base ItalBusiness)
   const [position, setPosition] = useState<{ lat: number; lng: number }>(FUSAGASUGA_CENTER);
-
   const [geoError, setGeoError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState<boolean>(false);
-  const watchIdRef = useRef<number | null>(null);
 
-  // Guardar ubicación en Firestore sólo cuando hay coordenadas GPS reales
+  const watchIdRef = useRef<number | null>(null);
+  const lastSavedPosRef = useRef<{ lat: number; lng: number } | null>(null);
+  const lastSaveTimeRef = useRef<number>(0);
+
+  // Guardar ubicación en Firestore con throttle inteligente para no saturar base de datos
   const saveLocationToFirestore = useCallback(
     async (lat: number, lng: number) => {
       if (!driverId || !isValidPos({ lat, lng })) return;
+
+      const now = Date.now();
+      // Throttle: Guardar si se movió más de 15 metros O han pasado al menos 5 segundos
+      if (lastSavedPosRef.current) {
+        const movedKm = calculateHaversineKm(lastSavedPosRef.current, { lat, lng });
+        const timeSinceLastSave = now - lastSaveTimeRef.current;
+        if (movedKm < 0.015 && timeSinceLastSave < 5000) {
+          return;
+        }
+      }
+
       try {
         setIsSaving(true);
+        lastSavedPosRef.current = { lat, lng };
+        lastSaveTimeRef.current = now;
+
         const docRef = doc(db, 'drivers_location', driverId);
         await setDoc(
           docRef,
           {
             driverId,
             driverName,
+            vehicleType,
             lat,
             lng,
             timestamp: new Date().toISOString(),
@@ -62,47 +69,51 @@ export const DriverLiveMap: React.FC<DriverLiveMapProps> = ({
         );
         setLastUpdated(new Date().toLocaleTimeString('es-CO'));
       } catch (err) {
-        console.error('Error al guardar ubicación de conductor en Firestore:', err);
+        console.warn('Notice saving driver location to Firestore:', err);
       } finally {
         setIsSaving(false);
       }
     },
-    [driverId, driverName, isOnline]
+    [driverId, driverName, vehicleType, isOnline]
   );
 
-  // Cargar primero la ubicación guardada en Firestore si existe
+  // Escuchar ubicación previa guardada en Firestore si no se ha detectado el GPS local
   useEffect(() => {
     if (!driverId) return;
     const docRef = doc(db, 'drivers_location', driverId);
-    const unsubscribe = onSnapshot(docRef, (snap) => {
-      if (snap.exists()) {
-        const data = snap.data();
-        if (isValidPos({ lat: data.lat, lng: data.lng })) {
-          setPosition({ lat: data.lat, lng: data.lng });
-          if (data.timestamp) {
-            try {
-              setLastUpdated(new Date(data.timestamp).toLocaleTimeString('es-CO'));
-            } catch {
-              // ignore date parse error
+    const unsubscribe = onSnapshot(
+      docRef,
+      (snap) => {
+        if (snap.exists()) {
+          const data = snap.data();
+          if (isValidPos({ lat: data.lat, lng: data.lng })) {
+            setPosition({ lat: data.lat, lng: data.lng });
+            if (data.timestamp) {
+              try {
+                setLastUpdated(new Date(data.timestamp).toLocaleTimeString('es-CO'));
+              } catch {}
             }
           }
         }
+      },
+      (err) => {
+        console.warn('Firestore snapshot notice on drivers_location:', err);
       }
-    });
+    );
     return () => unsubscribe();
   }, [driverId]);
 
-  // Rastrear posición GPS del dispositivo con alta precisión e inmediata adquisición
+  // Rastrear posición GPS del conductor con alta precisión
   useEffect(() => {
-    if (!navigator.geolocation) {
-      setGeoError('La geolocalización no está soportada por tu navegador.');
+    if (typeof window === 'undefined' || !navigator.geolocation) {
+      setGeoError('La geolocalización no está soportada por el navegador.');
       return;
     }
 
     const geoOptions: PositionOptions = {
       enableHighAccuracy: true,
-      timeout: 15000,
-      maximumAge: 1000,
+      timeout: 12000,
+      maximumAge: 2000,
     };
 
     const handleSuccess = (pos: GeolocationPosition) => {
@@ -117,19 +128,12 @@ export const DriverLiveMap: React.FC<DriverLiveMapProps> = ({
     };
 
     const handleError = (err: GeolocationPositionError) => {
-      console.warn('Geolocation error:', err.message);
-      setGeoError('Obteniendo señal GPS... Asegúrate de permitir el acceso a tu ubicación.');
+      console.warn('Geolocation notice:', err.message);
+      setGeoError('Buscando señal GPS... Por favor activa la ubicación en tu dispositivo.');
     };
 
-    // Obtener la posición actual de inmediato
     navigator.geolocation.getCurrentPosition(handleSuccess, handleError, geoOptions);
-
-    // Iniciar rastreo continuo
-    watchIdRef.current = navigator.geolocation.watchPosition(
-      handleSuccess,
-      handleError,
-      geoOptions
-    );
+    watchIdRef.current = navigator.geolocation.watchPosition(handleSuccess, handleError, geoOptions);
 
     return () => {
       if (watchIdRef.current !== null) {
@@ -138,56 +142,78 @@ export const DriverLiveMap: React.FC<DriverLiveMapProps> = ({
     };
   }, [saveLocationToFirestore]);
 
+  // Distancia del conductor al punto de recogida (si existe un viaje en curso)
+  const distanceToPickup =
+    origen && isValidPos(origen) && isValidPos(position)
+      ? calculateHaversineKm(position, origen)
+      : null;
+
   return (
     <div className="w-full space-y-3 notranslate" translate="no">
-      {/* Alerta de error si existe */}
+      {/* Alerta de GPS si no hay señal */}
       {geoError && (
-        <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs p-3 rounded-2xl flex items-center justify-between">
-          <span>⚠️ {geoError}</span>
+        <div className="bg-amber-50 border border-amber-200 text-amber-900 text-xs p-3 rounded-2xl flex items-center justify-between">
+          <span className="flex items-center gap-1.5 font-medium">
+            <span>⚠️</span>
+            <span>{geoError}</span>
+          </span>
           <button
             type="button"
             onClick={() => setGeoError(null)}
-            className="text-amber-900 font-bold ml-2 underline text-[10px]"
+            className="text-amber-800 font-bold ml-2 underline text-[10px] cursor-pointer"
           >
             Entendido
           </button>
         </div>
       )}
 
-      {/* Estado del Riego GPS */}
-      <div className="flex items-center justify-between bg-slate-900 text-white p-3 rounded-2xl text-xs font-semibold">
+      {/* Barra de Estado del GPS del Conductor */}
+      <div className="flex flex-wrap items-center justify-between bg-slate-900 text-white p-3 rounded-2xl text-xs font-semibold gap-2 shadow-sm">
         <div className="flex items-center gap-2">
-          <span className="w-3 h-3 rounded-full bg-emerald-400 animate-pulse border-2 border-slate-900"></span>
-          <span>Rastreo GPS en Tiempo Real ({driverName})</span>
+          <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse border-2 border-slate-900"></span>
+          <span>Rastreo GPS en Tiempo Real • {driverName}</span>
         </div>
-        <div className="text-[10px] text-slate-300 font-mono">
-          {lastUpdated ? `Actualizado: ${lastUpdated}` : 'Conectando GPS...'}
+        <div className="flex items-center gap-2">
+          {distanceToPickup !== null && (
+            <span className="text-[11px] font-bold text-emerald-400 bg-emerald-950/80 border border-emerald-500/30 px-2 py-0.5 rounded-lg">
+              📍 {distanceToPickup} km al pasajero
+            </span>
+          )}
+          <span className="text-[10px] text-slate-300 font-mono">
+            {lastUpdated ? `GPS: ${lastUpdated}` : 'Conectando satélites...'}
+          </span>
         </div>
       </div>
 
-      {/* Componente de mapa unificado para conductor (muestra sólo ubicación del conductor y punto de recogida del cliente) */}
+      {/* Componente de Mapa OpenStreetMap */}
       <MapComponent
         center={position}
         zoom={15}
         driverPos={position}
         driverName={driverName}
+        vehicleType={vehicleType}
         origen={origen || undefined}
-        destino={null}
+        destino={destino || undefined}
         showRoute={showRoute || !!origen}
-        className="w-full h-[380px] rounded-3xl overflow-hidden shadow-lg border border-slate-200 relative"
+        className="w-full h-[380px] sm:h-[420px] rounded-3xl overflow-hidden shadow-lg border border-slate-200 relative"
       />
 
-      {/* Coordenadas en tiempo real */}
+      {/* Coordenadas en tiempo real y estado de sincronización */}
       <div className="p-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs flex items-center justify-between">
         <div>
-          <span className="text-[10px] uppercase font-bold text-slate-400 block">Tu Posición GPS Actual:</span>
+          <span className="text-[9.5px] uppercase font-bold text-slate-400 block">Coordenadas del Vehículo:</span>
           <p className="font-mono text-slate-800 font-bold mt-0.5">
-            {isValidPos(position) ? `${position.lat.toFixed(6)}, ${position.lng.toFixed(6)}` : 'Obteniendo GPS...'}
+            {isValidPos(position) ? `${position.lat.toFixed(5)}, ${position.lng.toFixed(5)}` : 'Obteniendo GPS...'}
           </p>
         </div>
-        {isSaving && (
-          <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-full border border-indigo-100">
+        {isSaving ? (
+          <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-full border border-indigo-100 animate-pulse">
             Sincronizando...
+          </span>
+        ) : (
+          <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-100 flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            En Línea
           </span>
         )}
       </div>
