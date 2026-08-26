@@ -192,7 +192,7 @@ export const AdminDriversPanel: React.FC<AdminDriversPanelProps> = ({
                     const selfie = docs.selfieUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400';
 
                     return (
-                      <tr key={driver.id || `driver-table-${index}`} className="hover:bg-slate-50/60 transition-colors">
+                      <tr key={`pending-driver-row-${driver.id || index}-${index}`} className="hover:bg-slate-50/60 transition-colors">
                         {/* Foto / Selfie */}
                         <td className="py-4 px-6">
                           <div 
@@ -295,7 +295,7 @@ export const AdminDriversPanel: React.FC<AdminDriversPanelProps> = ({
                 const selfie = docs.selfieUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400';
 
                 return (
-                  <div key={driver.id || `driver-card-${index}`} className="p-4 sm:p-6 space-y-4">
+                  <div key={`pending-driver-card-${driver.id || index}-${index}`} className="p-4 sm:p-6 space-y-4">
                     <div className="flex items-start gap-4">
                       <img 
                         src={selfie} 

@@ -243,7 +243,7 @@ export const PassengerMap: React.FC<PassengerMapProps> = ({
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
           {QUICK_DESTINATIONS.map((dest, idx) => (
             <button
-              key={idx}
+              key={`quick-dest-${dest.name || idx}-${idx}`}
               type="button"
               onClick={() => handleQuickDestinationSelect(dest)}
               className="bg-slate-100 hover:bg-emerald-50 hover:text-emerald-800 hover:border-emerald-200 border border-slate-200 px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-700 whitespace-nowrap transition-all active:scale-95 cursor-pointer shrink-0"

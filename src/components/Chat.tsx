@@ -91,7 +91,7 @@ export const Chat: React.FC<ChatProps> = ({ viajeId, senderId, senderName, recip
                   <motion.div
                     initial={{ opacity: 0, x: isMe ? 20 : -20 }}
                     animate={{ opacity: 1, x: 0 }}
-                    key={msg.id || index}
+                    key={`chat-bubble-${msg.id || index}-${index}`}
                     className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}
                   >
                     <div className={`max-w-[80%] space-y-1`}>
