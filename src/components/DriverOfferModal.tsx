@@ -59,10 +59,10 @@ export default function DriverOfferModal({ service, onClose, onSendOffer, driver
         <div className="mb-4">
           <p className="text-xs font-bold uppercase tracking-wider mb-2 text-slate-700">¿Cuánto ofreces al pasajero?</p>
           <div className="grid grid-cols-4 gap-2 mb-3">
-            {quickPrices.map(p => (
+            {quickPrices.map((p, pIdx) => (
               <button 
                 type="button"
-                key={p.label + p.value}
+                key={`quick-price-${p.label}-${p.value}-${pIdx}`}
                 onClick={() => setSelectedPrice(p.value)}
                 className={`p-2.5 rounded-xl border-2 text-center transition-all cursor-pointer ${
                   selectedPrice === p.value 
@@ -95,10 +95,10 @@ export default function DriverOfferModal({ service, onClose, onSendOffer, driver
         <div className="mb-4">
           <p className="text-xs font-bold uppercase tracking-wider mb-2 text-slate-700">¿En cuántos minutos llegas?</p>
           <div className="flex gap-2 justify-between">
-            {times.map(t => (
+            {times.map((t, tIdx) => (
               <button 
                 type="button"
-                key={t}
+                key={`time-opt-${t}-${tIdx}`}
                 onClick={() => setSelectedTime(t)}
                 className={`flex-1 py-2.5 rounded-xl border-2 transition-all cursor-pointer ${
                   selectedTime === t 

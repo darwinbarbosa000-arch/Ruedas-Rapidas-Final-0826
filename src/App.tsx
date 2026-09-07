@@ -5104,6 +5104,7 @@ export default function App() {
                     <AnimatePresence>
                       {!conductor && showDriverInvite && (
                         <motion.div 
+                          key="driver-invite-banner"
                           initial={{ opacity: 0, y: -6, scale: 0.99 }}
                           animate={{ opacity: 1, y: 0, scale: 1 }}
                           exit={{ opacity: 0, height: 0, marginTop: 0, marginBottom: 0, padding: 0, overflow: 'hidden' }}
@@ -5739,6 +5740,7 @@ export default function App() {
                   <AnimatePresence>
                     {showAlianzasBanner && (
                       <motion.div 
+                        key="alianzas-banner-root"
                         initial={{ opacity: 0, height: 0, scale: 0.96, marginBottom: 0 }}
                         animate={{ opacity: 1, height: 'auto', scale: 1, marginBottom: 16 }}
                         exit={{ opacity: 0, height: 0, scale: 0.96, marginBottom: 0 }}
@@ -5776,7 +5778,7 @@ export default function App() {
                                 </h4>
                                 <AnimatePresence mode="wait">
                                   <motion.p
-                                    key={guidePhraseIdx}
+                                    key={`guide-phrase-${guidePhraseIdx}`}
                                     initial={{ opacity: 0, y: 4 }}
                                     animate={{ opacity: 1, y: 0 }}
                                     exit={{ opacity: 0, y: -4 }}
@@ -5815,6 +5817,7 @@ export default function App() {
                           <AnimatePresence>
                             {showNetworkGoals && (
                               <motion.div
+                                key="network-goals-popover"
                                 initial={{ opacity: 0, scale: 0.96, y: 5 }}
                                 animate={{ opacity: 1, scale: 1, y: 0 }}
                                 exit={{ opacity: 0, scale: 0.96, y: 5 }}
@@ -6111,7 +6114,6 @@ export default function App() {
                   {/* Alerta de Saldo Crítico */}
                   {(conductor.tarjeta_virtual || 0) < 2000 && (
                     <motion.div 
-                      key="critical-balance-alert"
                       initial={{ height: 0, opacity: 0 }}
                       animate={{ height: 'auto', opacity: 1 }}
                       transition={{ type: "spring", duration: 0.6 }}
@@ -6493,10 +6495,10 @@ export default function App() {
                       {misViajesConductor.length > 0 && (
                         <div className="space-y-4">
                           <h5 className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">Mis Viajes en Curso</h5>
-                          {misViajesConductor.map(viaje => (
+                          {misViajesConductor.map((viaje, vIdx) => (
                             <motion.div 
                               layout
-                              key={viaje.id}
+                              key={`conductor-viaje-${viaje.id || vIdx}-${vIdx}`}
                               className="bg-emerald-50 p-5 rounded-[2rem] border border-emerald-100 shadow-sm space-y-4"
                             >
                               <div className="flex justify-between items-start gap-4">
@@ -6785,9 +6787,9 @@ export default function App() {
                             <span className="text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">{misViajesExpresoPublicados.length}</span>
                           </h5>
                           <div className="space-y-4">
-                            {misViajesExpresoPublicados.map(viaje => (
+                            {misViajesExpresoPublicados.map((viaje, veIdx) => (
                               <motion.div 
-                                key={viaje.id} 
+                                key={`expreso-pub-${viaje.id || veIdx}-${veIdx}`} 
                                 initial={{ opacity: 0, y: 10 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm space-y-4"
@@ -6824,8 +6826,8 @@ export default function App() {
                                        <p className="text-[10px] font-bold text-slate-400 italic">No hay reservas aún</p>
                                      ) : (
                                        <div className="grid grid-cols-1 gap-2">
-                                         {Object.entries(viaje.pasajeros || {}).map(([uid, info]: [string, any]) => (
-                                           <div key={uid} className="flex justify-between items-center bg-white p-2.5 rounded-xl border border-slate-100">
+                                         {Object.entries(viaje.pasajeros || {}).map(([uid, info]: [string, any], pIdx) => (
+                                           <div key={`expreso-pasajero-${viaje.id || veIdx}-${uid || pIdx}-${pIdx}`} className="flex justify-between items-center bg-white p-2.5 rounded-xl border border-slate-100">
                                            <div className="flex items-center gap-2">
                                               <div className="flex items-center gap-2 mr-1">
                                                 <div className="w-7 h-7 bg-indigo-100 rounded-lg flex items-center justify-center text-indigo-600 text-[10px] font-bold">
@@ -6912,12 +6914,12 @@ export default function App() {
                                 }
                                 return true;
                               })
-                              .map((viaje) => (
+                              .map((viaje, vIdx) => (
                               <motion.div 
                                 layout
                                 initial={{ opacity: 0, x: -20 }}
                                 animate={{ opacity: 1, x: 0 }}
-                                key={viaje.id} 
+                                key={`solicitud-disponible-${viaje.id || vIdx}-${vIdx}`} 
                                 className={`bg-white p-5 rounded-[2rem] flex flex-col gap-4 border border-slate-150 shadow-sm hover:shadow-md transition-all relative overflow-hidden ${viaje.modoRosa ? 'border-l-4 border-l-pink-500' : ''}`}
                               >
                                 {/* Cabecera / Ruta */}
@@ -7401,6 +7403,7 @@ export default function App() {
           <AnimatePresence>
             {showRegistroConductorModal && (
               <RegistroConductor
+                key="registro-conductor-modal-root"
                 onSuccess={async (driverData) => {
                   setShowRegistroConductorModal(false);
                   if (user) {
@@ -7537,9 +7540,9 @@ export default function App() {
                           { id: 'alertas', label: 'Alertas', icon: ShieldAlert },
                           { id: 'soporte', label: 'Soporte', icon: Headphones },
                           { id: 'aliados', label: 'Aliados', icon: Store }
-                        ].map((tab) => (
+                        ].map((tab, tIdx) => (
                           <button 
-                            key={tab.id}
+                            key={`admin-subtab-${tab.id}-${tIdx}`}
                             onClick={() => setAdminSubTab(tab.id as any)}
                             className={`flex items-center gap-2 px-3 py-2 rounded-xl text-[10px] font-bold uppercase transition-all whitespace-nowrap relative ${adminSubTab === tab.id ? 'bg-white text-indigo-600 shadow-sm border border-slate-200' : 'text-slate-500 hover:text-slate-800 hover:bg-white/50'}`}
                           >
@@ -7601,7 +7604,7 @@ export default function App() {
                   <div className="min-h-[400px]">
                     <AnimatePresence mode="wait">
                       <motion.div
-                        key={adminSubTab}
+                        key={`admin-subtab-panel-${adminSubTab}`}
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -10 }}
@@ -7627,12 +7630,12 @@ export default function App() {
 
                             {calificacionesBajas.length > 0 ? (
                               <div className="space-y-3">
-                                {calificacionesBajas.map(calif => {
+                                {calificacionesBajas.map((calif, cIdx) => {
                                   const driverInfo = allDrivers.find(d => d.id === calif.conductorId);
                                   return (
                                     <motion.div 
                                       layout
-                                      key={calif.id}
+                                      key={`calif-baja-${calif.id || cIdx}-${cIdx}`}
                                       className="bg-white p-5 rounded-[2rem] border border-slate-100 shadow-sm space-y-4"
                                     >
                                       <div className="flex justify-between items-start">
@@ -7646,9 +7649,9 @@ export default function App() {
                                           </div>
                                         </div>
                                         <div className="flex items-center gap-1 bg-amber-50 px-3 py-1 rounded-full">
-                                          {[1, 2, 3, 4, 5].map(star => (
+                                          {[1, 2, 3, 4, 5].map((star) => (
                                             <Star 
-                                              key={star} 
+                                              key={`calif-star-${calif.id || cIdx}-${cIdx}-${star}`} 
                                               size={12} 
                                               className={star <= calif.estrellas ? "text-amber-500 fill-amber-500" : "text-slate-200"} 
                                             />
@@ -7772,7 +7775,7 @@ export default function App() {
                                 const criticalCount = trips.filter(t => (currentTime.getTime() - new Date(t.fecha).getTime()) > 6 * 60 * 1000).length;
 
                                 return (
-                                  <div key={city} className="space-y-6">
+                                  <div key={`unattended-city-${city || cityIdx}-${cityIdx}`} className="space-y-6">
                                     {/* City Header */}
                                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-4">
                                       <div className="flex items-center gap-4">
@@ -7815,7 +7818,7 @@ export default function App() {
                                                 initial={{ opacity: 0, y: 10 }}
                                                 animate={{ opacity: 1, y: 0 }}
                                                 transition={{ delay: idx * 0.05 }}
-                                                key={trip.id}
+                                                key={`city-unattended-trip-${trip.id || idx}-${idx}`}
                                                 className={`group bg-white rounded-[2.5rem] border-2 transition-all p-6 ${
                                                   urgency === 'critical' ? 'border-rose-100 bg-rose-50/10' : 
                                                   urgency === 'high' ? 'border-amber-100 bg-amber-50/10' : 'border-slate-50'
@@ -7918,7 +7921,7 @@ export default function App() {
                                               initial={{ opacity: 0, x: 20 }}
                                               animate={{ opacity: 1, x: 0 }}
                                               transition={{ delay: dIdx * 0.05 }}
-                                              key={d.id}
+                                              key={`city-driver-${d.id || dIdx}-${dIdx}`}
                                               className="bg-white p-4 rounded-2xl border border-slate-100 flex items-center gap-4 group hover:border-emerald-200 transition-all shadow-sm"
                                             >
                                               <div className="relative">
@@ -8074,8 +8077,8 @@ export default function App() {
                                 </div>
                               </div>
                               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                {historicalWaitingStats.todayCancelled.slice(0, 18).map((trip: any) => (
-                                  <div key={trip.id} className="p-6 bg-slate-50 rounded-[2.5rem] border border-slate-100 hover:bg-white hover:shadow-2xl hover:shadow-slate-200/50 transition-all group overflow-hidden">
+                                {historicalWaitingStats.todayCancelled.slice(0, 18).map((trip: any, tIdx: number) => (
+                                  <div key={`today-cancelled-${trip.id || tIdx}-${tIdx}`} className="p-6 bg-slate-50 rounded-[2.5rem] border border-slate-100 hover:bg-white hover:shadow-2xl hover:shadow-slate-200/50 transition-all group overflow-hidden">
                                     <div className="flex justify-between items-start mb-6">
                                       <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-xl ${
                                         trip.canceladoPor === 'usuario' ? 'bg-indigo-500 shadow-indigo-100' :
@@ -8251,7 +8254,7 @@ export default function App() {
                               </div>
                               <div className="space-y-3">
                                 {rechargesStats.topDrivers.map((d: any, idx: number) => (
-                                  <div key={idx} className="flex items-center justify-between p-3 bg-slate-50/50 rounded-2xl border border-slate-100 hover:border-indigo-100 hover:bg-white transition-all group">
+                                  <div key={`top-recharge-driver-${d.id || d.name || idx}-${idx}`} className="flex items-center justify-between p-3 bg-slate-50/50 rounded-2xl border border-slate-100 hover:border-indigo-100 hover:bg-white transition-all group">
                                     <div className="flex items-center gap-3">
                                       <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-[10px] font-black shadow-sm group-hover:rotate-6 transition-transform ${idx === 0 ? 'bg-amber-100 text-amber-600' : 'bg-white text-slate-400'}`}>
                                         {idx + 1}
@@ -8318,7 +8321,7 @@ export default function App() {
                                 {recargasPendientes.map((recarga, rIdx) => (
                                   <motion.div 
                                     layout
-                                    key={recarga.id || `recarga-pend-${rIdx}`} 
+                                    key={`recarga-pend-${recarga.id || rIdx}-${rIdx}`} 
                                     className="bg-white p-5 rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-md transition-all group"
                                   >
                                     <div className="flex justify-between items-start mb-4">
@@ -8401,7 +8404,7 @@ export default function App() {
                                 <motion.div 
                                   initial={{ opacity: 0 }}
                                   animate={{ opacity: 1 }}
-                                  key={recarga.id || `recarga-hist-${rIdx}`} 
+                                  key={`recarga-hist-${recarga.id || rIdx}-${rIdx}`} 
                                   className="bg-white p-4 rounded-3xl border border-slate-100 flex items-center justify-between group"
                                 >
                                   <div className="flex items-center gap-3">
@@ -8498,7 +8501,7 @@ export default function App() {
                               .map((cond, cIdx) => (
                               <motion.div 
                                 layout
-                                key={cond.id || `driver-item-${cIdx}`} 
+                                key={`driver-item-${cond.id || cIdx}-${cIdx}`} 
                                 className={`bg-white p-6 rounded-[2.5rem] border shadow-sm space-y-5 transition-all group ${cond.activo ? 'border-emerald-100 ring-4 ring-emerald-50/20' : 'border-slate-100'}`}
                               >
                                 <div className="flex justify-between items-start">
@@ -8602,9 +8605,9 @@ export default function App() {
                                   <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 sm:col-span-1">
                                     <p className="text-[9px] uppercase font-bold text-slate-400 mb-3 tracking-[0.1em]">Documentos</p>
                                     <div className="flex gap-1.5 flex-wrap">
-                                      {['licencia', 'soat', 'cedula'].map(docType => (
+                                      {['licencia', 'soat', 'cedula'].map((docType, dIdx) => (
                                         <button
-                                          key={docType}
+                                          key={`doc-type-${cond.id || cIdx}-${docType}-${dIdx}`}
                                           onClick={() => {
                                             const newDocs = { ...cond.documentos_autorizados, [docType]: !cond.documentos_autorizados?.[docType] };
                                             updateDoc(doc(db, 'conductores', cond.id), { documentos_autorizados: newDocs });
@@ -8834,7 +8837,7 @@ export default function App() {
                                 return true;
                               })
                               .map((u, uIdx) => (
-                              <div key={u.id || `user-item-${uIdx}`} className="space-y-1">
+                              <div key={`user-item-${u.id || uIdx}-${uIdx}`} className="space-y-1">
                                 <motion.div 
                                   layout
                                   className="bg-white p-5 rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-md transition-all duration-500 relative flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 group z-10"
@@ -9042,7 +9045,7 @@ export default function App() {
                             ) : (
                               supportChats.map((chat, cIdx) => (
                                 <button 
-                                  key={chat.conductorId || `chat-${cIdx}`}
+                                  key={`support-chat-${chat.conductorId || cIdx}-${cIdx}`}
                                   onClick={() => {
                                     setActiveSupportConductor({ id: chat.conductorId, nombre: chat.conductorNombre });
                                     setShowSupportChat(true);
@@ -9248,9 +9251,9 @@ export default function App() {
                                     onChange={e => setNuevaMarcaCiudad(e.target.value)}
                                   />
                                   <div className="flex flex-wrap gap-1 mt-1.5">
-                                    {['Fusagasugá', 'Bogotá', 'Girardot', 'Melgar', 'Pasca', 'Silvania', 'Arauca'].map(city => (
+                                    {['Fusagasugá', 'Bogotá', 'Girardot', 'Melgar', 'Pasca', 'Silvania', 'Arauca'].map((city, cIdx) => (
                                       <button
-                                        key={city}
+                                        key={`marca-quick-city-${city}-${cIdx}`}
                                         type="button"
                                         onClick={() => setNuevaMarcaCiudad(city)}
                                         className={`text-[8px] font-bold px-2 py-0.5 rounded-md transition-colors ${nuevaMarcaCiudad.toLowerCase() === city.toLowerCase() ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
@@ -9402,9 +9405,9 @@ export default function App() {
                                       { id: 'aprobados', label: 'Aprobadas', count: marcasAliadas.filter(isMarcaAprobada).length, color: 'emerald' },
                                       { id: 'rechazados', label: 'Rechazadas', count: marcasAliadas.filter(isMarcaRechazada).length, color: 'rose' },
                                       { id: 'todos', label: 'Todas', count: marcasAliadas.length, color: 'slate' }
-                                    ].map(tab => (
+                                    ].map((tab, tIdx) => (
                                       <button
-                                        key={tab.id}
+                                        key={`admin-aliados-filter-${tab.id}-${tIdx}`}
                                         onClick={() => setAdminAliadosFilter(tab.id as any)}
                                         className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
                                           adminAliadosFilter === tab.id
@@ -9487,7 +9490,7 @@ export default function App() {
 
                                       return (
                                         <div 
-                                          key={marca.id || `marca-${mIdx}`} 
+                                          key={`marca-admin-${marca.id || mIdx}-${mIdx}`} 
                                           className={`p-4.5 rounded-3xl bg-white border transition-all flex flex-col justify-between relative shadow-sm hover:shadow-md ${
                                             isPend 
                                               ? 'border-amber-300 ring-4 ring-amber-500/5' 
@@ -9778,6 +9781,7 @@ export default function App() {
             <AnimatePresence>
               {showTripRequestModal && (
                 <motion.div 
+                  key="trip-request-modal-root"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
@@ -9958,14 +9962,14 @@ export default function App() {
                                       }
                                     });
 
-                                    return mergedCategories.map(cat => {
+                                    return mergedCategories.map((cat, catIdx) => {
                                       const isSelected = selectedBrandCategory === cat;
                                       const count = getCategoryCount(cat);
                                       const { bg: catBg, Icon: FilterIcon } = getCategoryStyles(cat);
 
                                       return (
                                         <button
-                                          key={cat}
+                                          key={`brand-cat-${cat}-${catIdx}`}
                                           type="button"
                                           onClick={() => setSelectedBrandCategory(cat)}
                                           className={`flex items-center gap-2 px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-wider transition-all border shrink-0 cursor-pointer ${
@@ -10039,7 +10043,7 @@ export default function App() {
                                             
                                             return (
                                               <motion.div
-                                                key={`offer-${marca.id || mIdx}`}
+                                                key={`offer-${marca.id || mIdx}-${mIdx}`}
                                                 whileHover={{ y: -3, scale: 1.01 }}
                                                 whileTap={{ scale: 0.99 }}
                                                 onClick={() => setSelectedAliadoForUser(marca)}
@@ -10176,7 +10180,7 @@ export default function App() {
                                       return (
                                         <motion.div 
                                           layout
-                                          key={marca.id || `aliado-${mIdx}`}
+                                          key={`aliado-item-${marca.id || mIdx}-${mIdx}`}
                                           onClick={() => setSelectedAliadoForUser(marca)}
                                           className="bg-white rounded-3xl border border-slate-150 overflow-hidden flex flex-col justify-between shadow-xs hover:shadow-lg hover:border-rose-300 transition-all duration-300 hover:-translate-y-0.5 group relative cursor-pointer"
                                         >
@@ -10506,7 +10510,9 @@ export default function App() {
             {/* Expreso Publish Modal (Driver) */}
             <AnimatePresence>
               {showExpresoModal && (
-                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[110] flex items-end sm:items-center justify-center p-4">
+                <div
+                  key="expreso-modal-root"
+                  className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[110] flex items-end sm:items-center justify-center p-4">
                   <motion.div 
                     initial={{ y: "100%", opacity: 0 }}
                     animate={{ y: 0, opacity: 1 }}
@@ -10701,7 +10707,9 @@ export default function App() {
             {/* Cargo Selection Modal */}
             <AnimatePresence>
               {showCargoSelector && (
-                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[110] flex items-end sm:items-center justify-center p-4">
+                <div
+                  key="cargo-selector-modal-root"
+                  className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[110] flex items-end sm:items-center justify-center p-4">
                   <motion.div 
                     initial={{ y: "100%", opacity: 0 }}
                     animate={{ y: 0, opacity: 1 }}
@@ -10797,7 +10805,9 @@ export default function App() {
             {/* Expreso Booking Modal (User) */}
             <AnimatePresence>
               {showExpresoBookingModal && (
-                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[110] flex items-end sm:items-center justify-center p-4">
+                <div
+                  key="expreso-booking-modal-root"
+                  className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[110] flex items-end sm:items-center justify-center p-4">
                   <motion.div 
                     initial={{ y: "100%", opacity: 0 }}
                     animate={{ y: 0, opacity: 1 }}
@@ -10906,9 +10916,9 @@ export default function App() {
                                  <p className="text-slate-400 text-[10px] font-medium mt-1">Intenta cambiar los filtros de origen y destino</p>
                                </div>
                              ) : (
-                               filteredExpresoViajes.map(viaje => (
+                               filteredExpresoViajes.map((viaje, evIdx) => (
                                  <motion.div 
-                                   key={viaje.id}
+                                   key={`expreso-card-${viaje.id || evIdx}-${evIdx}`}
                                    whileHover={{ scale: 1.02 }}
                                    onClick={() => {
                                      setSelectedExpresoTrip(viaje);
@@ -11022,9 +11032,9 @@ export default function App() {
                                  </div>
                                )}
                                <div className="flex justify-center gap-4">
-                                  {[1, 2, 3, 4].map(num => (
+                                  {[1, 2, 3, 4].map((num, nIdx) => (
                                     <button
-                                      key={num}
+                                      key={`expreso-cupos-opt-${num}-${nIdx}`}
                                       disabled={num > liveSelectedExpresoTrip.cuposDisponibles}
                                       onClick={() => setExpresoForm({...expresoForm, cuposTotales: num})}
                                       className={`w-14 h-14 rounded-2xl flex items-center justify-center font-black text-lg transition-all ${
@@ -11161,6 +11171,7 @@ export default function App() {
             <AnimatePresence>
               {showRegModal && (
                 <motion.div 
+                  key="user-reg-modal-root"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
@@ -11256,8 +11267,8 @@ export default function App() {
                                     });
                                   }}
                                 >
-                                  {DEPARTMENTS_LIST.map(dep => (
-                                    <option key={dep} value={dep}>{dep}</option>
+                                  {DEPARTMENTS_LIST.map((dep, depIdx) => (
+                                    <option key={`reg-dep-${dep}-${depIdx}`} value={dep}>{dep}</option>
                                   ))}
                                 </select>
                               )}
@@ -11279,8 +11290,8 @@ export default function App() {
                                   value={regData.ciudad}
                                   onChange={e => setRegData({...regData, ciudad: e.target.value})}
                                 >
-                                  {(COLOMBIA_DEPARTMENTS[regData.departamento || 'Cundinamarca'] || []).map(city => (
-                                    <option key={city} value={city}>{city}</option>
+                                  {(COLOMBIA_DEPARTMENTS[regData.departamento || 'Cundinamarca'] || []).map((city, cIdx) => (
+                                    <option key={`reg-city-${city}-${cIdx}`} value={city}>{city}</option>
                                   ))}
                                 </select>
                               )}
@@ -11395,8 +11406,8 @@ export default function App() {
                                     });
                                   }}
                                 >
-                                  {DEPARTMENTS_LIST.map(dep => (
-                                    <option key={dep} value={dep}>{dep}</option>
+                                  {DEPARTMENTS_LIST.map((dep, depIdx) => (
+                                    <option key={`marca-reg-dep-${dep}-${depIdx}`} value={dep}>{dep}</option>
                                   ))}
                                 </select>
                               )}
@@ -11418,8 +11429,8 @@ export default function App() {
                                   value={regData.ciudad}
                                   onChange={e => setRegData({...regData, ciudad: e.target.value})}
                                 >
-                                  {(COLOMBIA_DEPARTMENTS[regData.departamento || 'Cundinamarca'] || []).map(city => (
-                                    <option key={city} value={city}>{city}</option>
+                                  {(COLOMBIA_DEPARTMENTS[regData.departamento || 'Cundinamarca'] || []).map((city, cIdx) => (
+                                    <option key={`marca-reg-city-${city}-${cIdx}`} value={city}>{city}</option>
                                   ))}
                                 </select>
                               )}
@@ -11495,6 +11506,7 @@ export default function App() {
             <AnimatePresence>
               {showProfileModal && (
                 <motion.div 
+                  key="user-profile-modal-root"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
@@ -11579,8 +11591,8 @@ export default function App() {
                                 });
                               }}
                             >
-                              {DEPARTMENTS_LIST.map(dep => (
-                                <option key={dep} value={dep}>{dep}</option>
+                              {DEPARTMENTS_LIST.map((dep, depIdx) => (
+                                <option key={`profile-dep-${dep}-${depIdx}`} value={dep}>{dep}</option>
                               ))}
                             </select>
                           )}
@@ -11602,8 +11614,8 @@ export default function App() {
                               value={profileFormData.ciudad}
                               onChange={e => setProfileFormData({...profileFormData, ciudad: e.target.value})}
                             >
-                              {(COLOMBIA_DEPARTMENTS[profileFormData.departamento || 'Cundinamarca'] || []).map(city => (
-                                <option key={city} value={city}>{city}</option>
+                              {(COLOMBIA_DEPARTMENTS[profileFormData.departamento || 'Cundinamarca'] || []).map((city, cIdx) => (
+                                <option key={`profile-city-${city}-${cIdx}`} value={city}>{city}</option>
                               ))}
                             </select>
                           )}
@@ -11689,6 +11701,7 @@ export default function App() {
             <AnimatePresence>
               {showTermsModal && (
                 <motion.div 
+                  key="terms-conditions-modal-root"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
@@ -11825,8 +11838,8 @@ export default function App() {
                            onChange={e => setDispatchSelectedAliadoId(e.target.value)}
                          >
                            <option value="">-- Selecciona un Negocio Registrado --</option>
-                           {marcasAliadas.map(m => (
-                             <option key={m.id} value={m.id}>
+                           {marcasAliadas.map((m, mIdx) => (
+                             <option key={`dispatch-m-${m.id || mIdx}-${mIdx}`} value={m.id}>
                                {m.nombre} ({m.ciudad} - {m.direccion})
                              </option>
                            ))}
@@ -12612,6 +12625,7 @@ export default function App() {
             <AnimatePresence>
               {showDriverRegModal && (
                 <motion.div 
+                  key="driver-reg-modal-root"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
@@ -12669,8 +12683,8 @@ export default function App() {
                               }}
                               className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
                             >
-                              {DEPARTMENTS_LIST.map(dep => (
-                                <option key={dep} value={dep}>{dep}</option>
+                              {DEPARTMENTS_LIST.map((dep, depIdx) => (
+                                <option key={`driver-reg-dep-${dep}-${depIdx}`} value={dep}>{dep}</option>
                               ))}
                             </select>
                           )}
@@ -12693,8 +12707,8 @@ export default function App() {
                               onChange={(e) => setDriverRegData({...driverRegData, ciudad: e.target.value})}
                               className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
                             >
-                              {(COLOMBIA_DEPARTMENTS[driverRegData.departamento || 'Cundinamarca'] || []).map(city => (
-                                <option key={city} value={city}>{city}</option>
+                              {(COLOMBIA_DEPARTMENTS[driverRegData.departamento || 'Cundinamarca'] || []).map((city, cIdx) => (
+                                <option key={`driver-reg-city-${city}-${cIdx}`} value={city}>{city}</option>
                               ))}
                             </select>
                           )}
@@ -12901,6 +12915,7 @@ export default function App() {
             <AnimatePresence>
               {showRechargeModal && (
                 <motion.div 
+                  key="recharge-modal-root"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
@@ -12977,7 +12992,9 @@ export default function App() {
             {/* Admin Action Modal */}
             <AnimatePresence>
               {showAdminActionModal && (
-                <div className="fixed inset-0 z-[110] flex items-center justify-center p-6">
+                <div
+                  key="admin-action-modal-root"
+                  className="fixed inset-0 z-[110] flex items-center justify-center p-6">
                   <motion.div 
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
@@ -13206,9 +13223,9 @@ export default function App() {
 
                               {/* Quick select hour chips */}
                               <div className="flex flex-wrap gap-2 justify-center select-none">
-                                {[1, 2, 4, 8, 12, 24, 48].map((h) => (
+                                {[1, 2, 4, 8, 12, 24, 48].map((h, hIdx) => (
                                   <button
-                                    key={h}
+                                    key={`bloqueo-hours-${h}-${hIdx}`}
                                     type="button"
                                     onClick={() => setBloqueoHoras(h)}
                                     className={`px-3 py-1.5 rounded-xl text-[10px] font-extrabold tracking-wider uppercase transition-all duration-300 border cursor-pointer ${
@@ -13279,7 +13296,9 @@ export default function App() {
             {/* Monitor Trip Cancellation Modal */}
             <AnimatePresence>
               {showAdminCancelTripModal && selectedTripForAdminCancel && (
-                <div className="fixed inset-0 z-[110] flex items-center justify-center p-6">
+                <div
+                  key="admin-cancel-trip-modal-root"
+                  className="fixed inset-0 z-[110] flex items-center justify-center p-6">
                   <motion.div 
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
@@ -13349,9 +13368,9 @@ export default function App() {
                             'Falta de conductores',
                             'Error en la solicitud',
                             'Otro'
-                          ].map((reason) => (
+                          ].map((reason, rIdx) => (
                             <button
-                              key={reason}
+                              key={`cancel-reason-opt-${reason}-${rIdx}`}
                               type="button"
                               onClick={() => {
                                 setAdminCancelReason(reason);
@@ -13470,13 +13489,12 @@ export default function App() {
               )}
             </AnimatePresence>
 
-            {/* Admin Message Modal / Chat */}
-            <AnimatePresence>
-              
             {/* Modal de Rechazo de Marca Aliada (Anti-Spam) */}
             <AnimatePresence>
               {marcaToRejectModal.isOpen && marcaToRejectModal.marca && (
-                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
+                <div
+                  key="marca-reject-modal-root"
+                  className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
                   <motion.div
                     initial={{ opacity: 0, scale: 0.95, y: 10 }}
                     animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -13525,9 +13543,9 @@ export default function App() {
                           'Dirección física o cobertura no verificable',
                           'Datos comerciales incompletos o erróneos',
                           'Otro motivo'
-                        ].map((mOption) => (
+                        ].map((mOption, mIdx) => (
                           <label
-                            key={mOption}
+                            key={`reject-moption-${mOption}-${mIdx}`}
                             onClick={() => setMarcaToRejectModal(prev => ({ ...prev, motivo: mOption }))}
                             className={`flex items-center gap-2.5 p-2.5 rounded-xl border text-xs font-bold cursor-pointer transition-all ${
                               marcaToRejectModal.motivo === mOption
@@ -13597,7 +13615,9 @@ export default function App() {
             {/* Modal de Inspección Detallada de Marca Aliada */}
             <AnimatePresence>
               {marcaToInspectModal && (
-                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[105] flex items-center justify-center p-4">
+                <div
+                  key="marca-inspect-modal-root"
+                  className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[105] flex items-center justify-center p-4">
                   <motion.div
                     initial={{ opacity: 0, scale: 0.95, y: 10 }}
                     animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -13783,8 +13803,12 @@ export default function App() {
               )}
             </AnimatePresence>
 
-            {showAdminMessageModal && adminMessageTarget && (
-                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+            {/* Admin Message Modal / Chat */}
+            <AnimatePresence>
+              {showAdminMessageModal && adminMessageTarget && (
+                <div
+                  key="admin-message-modal-root"
+                  className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
                   <motion.div 
                     initial={{ scale: 0.9, opacity: 0, y: 20 }}
                     animate={{ scale: 1, opacity: 1, y: 0 }}
@@ -13826,7 +13850,7 @@ export default function App() {
                         messagesAdminChat.map((msg, idx) => {
                           const isMe = msg.senderId === user?.uid;
                           return (
-                            <div key={msg.id || idx} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
+                            <div key={`admin-chat-msg-${msg.id || idx}-${idx}`} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
                               <div className={`max-w-[80%] rounded-2xl px-4 py-3 shadow-sm ${isMe ? 'bg-indigo-600 text-white rounded-tr-none' : 'bg-white text-slate-800 rounded-tl-none border border-slate-100'}`}>
                                 <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.mensaje}</p>
                                 <p className={`text-[8px] mt-1 font-bold uppercase tracking-tighter ${isMe ? 'text-indigo-200' : 'text-slate-400'}`}>
@@ -13873,6 +13897,7 @@ export default function App() {
             <AnimatePresence>
               {showDriverFinancesModal && (
                 <motion.div 
+                  key="driver-finances-modal-root"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
@@ -14109,7 +14134,7 @@ export default function App() {
                             </div>
                           ) : (
                             historialViajesConductor.slice(0, 5).map((viaje, vIdx) => (
-                              <div key={viaje.id || `hist-conductor-${vIdx}`} className="bg-slate-900/60 p-4 rounded-2xl border border-slate-800/50 flex items-center justify-between hover:bg-slate-900 transition-colors">
+                              <div key={`hist-conductor-${viaje.id || vIdx}-${vIdx}`} className="bg-slate-900/60 p-4 rounded-2xl border border-slate-800/50 flex items-center justify-between hover:bg-slate-900 transition-colors">
                                 <div className="space-y-1 text-left">
                                   <p className="text-xs font-bold text-slate-200 truncate max-w-[200px]">{viaje.ruta.destino}</p>
                                   <div className="flex items-center gap-2">
@@ -14140,6 +14165,7 @@ export default function App() {
             <AnimatePresence>
               {showLeaderboardModal && (
                 <motion.div 
+                  key="leaderboard-modal-root"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
@@ -14271,7 +14297,7 @@ export default function App() {
                             
                             return (
                               <div
-                                key={d.id || `leaderboard-${idx}`}
+                                key={`leaderboard-${d.id || idx}-${idx}`}
                                 className={`relative overflow-hidden p-4 rounded-3xl flex items-center gap-4 transition-all duration-300 border ${
                                   isMe 
                                     ? 'bg-slate-850 border-emerald-500/40 shadow-lg shadow-emerald-500/5' 
@@ -14366,6 +14392,7 @@ export default function App() {
             <AnimatePresence>
               {showUserFinancesModal && (
                 <motion.div 
+                  key="user-finances-modal-root"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
@@ -14433,6 +14460,7 @@ export default function App() {
             <AnimatePresence>
               {showHistory && (
                 <motion.div 
+                  key="history-modal-root"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
@@ -14490,7 +14518,7 @@ export default function App() {
                         </div>
                       ) : (
                         (historyType === 'conductor' ? historialViajesConductor : historialViajes).map((viaje, vIdx) => (
-                          <div key={viaje.id || `hist-viaje-${vIdx}`} className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm space-y-3">
+                          <div key={`hist-viaje-${viaje.id || vIdx}-${vIdx}`} className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm space-y-3">
                             <div className="flex justify-between items-start">
                               <div className="space-y-1">
                                 <p className="text-sm font-bold text-slate-800 leading-tight">{viaje.ruta.destino}</p>
@@ -14543,6 +14571,7 @@ export default function App() {
             <AnimatePresence>
               {showMovements && (
                 <motion.div 
+                  key="movements-modal-root"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
@@ -14584,7 +14613,7 @@ export default function App() {
                         </div>
                       ) : (
                         misMovimientos.map((mov, mIdx) => (
-                          <div key={mov.id || `mov-${mIdx}`} className="bg-white p-4 rounded-3xl border border-slate-100 shadow-sm flex items-center justify-between group">
+                          <div key={`mov-${mov.id || mIdx}-${mIdx}`} className="bg-white p-4 rounded-3xl border border-slate-100 shadow-sm flex items-center justify-between group">
                             <div className="flex items-center gap-3">
                               <div className={`w-10 h-10 rounded-2xl flex items-center justify-center ${
                                 mov.tipoDoc === 'recarga' 
@@ -14639,7 +14668,9 @@ export default function App() {
       
       <AnimatePresence>
         {confirmAction && (
-          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[200] flex items-end sm:items-center justify-center p-4">
+          <div
+            key="confirm-action-modal-root"
+            className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[200] flex items-end sm:items-center justify-center p-4">
             <motion.div 
               initial={{ y: "100%", opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}

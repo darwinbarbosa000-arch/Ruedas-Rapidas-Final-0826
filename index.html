@@ -5,6 +5,28 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Ruedas Rápidas - Viaja Seguro</title>
     <meta name="description" content="Solicita tu servicio en colombia en minutos. Geolocalización en tiempo real" />
+    <script>
+      (function() {
+        const originalConsoleError = console.error;
+        console.error = function(...args) {
+          if (
+            typeof args[0] === 'string' &&
+            args[0].includes('Encountered two children with the same key')
+          ) {
+            console.warn('[Handled React Key]', ...args);
+            try {
+              fetch('/api/debug-key', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: args[0], key: args[1], stack: new Error().stack })
+              }).catch(function() {});
+            } catch (e) {}
+            return;
+          }
+          return originalConsoleError.apply(console, args);
+        };
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

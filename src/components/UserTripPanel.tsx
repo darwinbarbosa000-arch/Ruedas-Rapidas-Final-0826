@@ -236,7 +236,7 @@ export default function UserTripPanel({
             <div className="flex justify-center gap-3 mb-3">
               {[1, 2, 3, 4, 5].map((star) => (
                 <button
-                  key={star}
+                  key={`user-trip-panel-star-${star}`}
                   type="button"
                   onClick={() => setRating(star)}
                   className="transition transform hover:scale-110 active:scale-95 p-1"

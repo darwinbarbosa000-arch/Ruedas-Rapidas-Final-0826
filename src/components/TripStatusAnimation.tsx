@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useId } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Car, MapPin, CheckCircle2, Navigation, Clock, Circle } from 'lucide-react';
 
@@ -8,6 +8,7 @@ interface TripStatusAnimationProps {
 }
 
 export const TripStatusAnimation: React.FC<TripStatusAnimationProps> = ({ status, role }) => {
+  const instanceId = useId();
   const getStatusConfig = () => {
     switch (status) {
       case 'aceptado':
@@ -71,7 +72,7 @@ export const TripStatusAnimation: React.FC<TripStatusAnimationProps> = ({ status
       <div className="flex items-center justify-between relative z-10">
         <div className="flex items-center gap-3">
           <motion.div 
-            key={status + 'icon'}
+            key={`trip-anim-${instanceId}-${status}-icon`}
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             className="w-10 h-10 rounded-2xl bg-white shadow-sm border border-slate-50 flex items-center justify-center relative"
@@ -89,7 +90,7 @@ export const TripStatusAnimation: React.FC<TripStatusAnimationProps> = ({ status
           
           <div className="flex flex-col">
             <motion.span 
-              key={status + 'text'}
+              key={`trip-anim-${instanceId}-${status}-text`}
               initial={{ x: -10, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
               className="text-xs font-black text-slate-800 uppercase tracking-tight"

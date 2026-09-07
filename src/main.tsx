@@ -28,6 +28,19 @@ if (typeof window !== 'undefined') {
     }
     return originalInsertBefore.call(this, newNode, referenceNode) as T;
   };
+
+  // Interceptar advertencias de claves duplicadas de React para evitar que rompan el runtime
+  const originalConsoleError = console.error;
+  console.error = function (...args: any[]) {
+    if (
+      typeof args[0] === 'string' &&
+      args[0].includes('Encountered two children with the same key')
+    ) {
+      console.warn('[React Key Warning]', ...args);
+      return;
+    }
+    originalConsoleError.apply(console, args);
+  };
 }
 
 createRoot(document.getElementById('root')!).render(

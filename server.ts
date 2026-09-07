@@ -28,6 +28,11 @@ const generalLimiter = rateLimit({
   }
 });
 
+app.post('/api/debug-key', (req, res) => {
+  console.log('[DEBUG REACT KEY]', JSON.stringify(req.body));
+  res.json({ ok: true });
+});
+
 // Aplicar Rate Limit General a todas las rutas de la API (/api/*)
 app.use('/api/', generalLimiter);
 
