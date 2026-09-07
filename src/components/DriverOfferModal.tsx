@@ -11,7 +11,7 @@ export interface DriverOfferModalProps {
 export default function DriverOfferModal({ service, onClose, onSendOffer, driverBalance, onRequestRecharge }: DriverOfferModalProps) {
   const basePrice = service?.valor || service?.basePrice || 5000;
   const currencySymbol = service?.currencySymbol || '$';
-  const commissionRate = 0.15; // 15% de comisión estándar
+  const commissionRate = 0.08; // 8% de comisión estándar
   
   const [selectedPrice, setSelectedPrice] = useState(basePrice + 2000);
   const [selectedTime, setSelectedTime] = useState(5);
@@ -25,7 +25,7 @@ export default function DriverOfferModal({ service, onClose, onSendOffer, driver
   
   const times = [3, 5, 8, 10, 15];
   const commission = Math.round(selectedPrice * commissionRate);
-  const netEarnings = selectedPrice - commission; // 85% para el conductor
+  const netEarnings = selectedPrice - commission; // 92% para el conductor
   const totalToCollect = selectedPrice; // 100% que paga el usuario
   const currentBalance = driverBalance !== undefined ? driverBalance : 133000;
   const hasEnoughBalance = currentBalance >= commission;
@@ -39,7 +39,7 @@ export default function DriverOfferModal({ service, onClose, onSendOffer, driver
           <div>
             <div className="flex items-center gap-2">
               <span className="text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-md">
-                Comisión 15%
+                Comisión 8%
               </span>
               <p className="text-xs text-slate-500 font-medium">Tarifa del pasajero</p>
             </div>
@@ -113,7 +113,7 @@ export default function DriverOfferModal({ service, onClose, onSendOffer, driver
           </div>
         </div>
 
-        {/* UI DESGLOSE DE COMISIÓN (15%) Y GANANCIA NETA */}
+        {/* UI DESGLOSE DE COMISIÓN (8%) Y GANANCIA NETA */}
         <div className="bg-slate-50/80 border border-slate-200/80 rounded-2xl p-4 mb-4 space-y-2.5">
           <div className="flex justify-between items-center text-xs">
             <span className="text-slate-600 font-medium">Cobro total al pasajero:</span>
@@ -123,7 +123,7 @@ export default function DriverOfferModal({ service, onClose, onSendOffer, driver
           <div className="flex justify-between items-center text-xs">
             <div className="flex items-center gap-1.5">
               <span className="text-slate-600 font-medium">Comisión de plataforma</span>
-              <span className="text-[9px] font-black bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded">15%</span>
+              <span className="text-[9px] font-black bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded">8%</span>
             </div>
             <span className="text-sm text-rose-600 font-black">- {currencySymbol} {commission.toLocaleString()} COP</span>
           </div>
@@ -131,7 +131,7 @@ export default function DriverOfferModal({ service, onClose, onSendOffer, driver
           <div className="border-t border-slate-200/80 pt-2.5 mt-1 flex justify-between items-center">
             <div>
               <span className="text-xs font-bold text-slate-800">Tu ganancia neta estimada:</span>
-              <p className="text-[10px] text-slate-400 font-medium">85% libre para el conductor</p>
+              <p className="text-[10px] text-slate-400 font-medium">92% libre para el conductor</p>
             </div>
             <span className="text-base text-emerald-600 font-black">{currencySymbol} {netEarnings.toLocaleString()} COP</span>
           </div>
@@ -142,7 +142,7 @@ export default function DriverOfferModal({ service, onClose, onSendOffer, driver
           <span className="text-sm">💡</span>
           <p className="text-[11px] text-amber-900 leading-snug font-medium">
             Recibirás <strong className="font-bold text-amber-950">{currencySymbol}{selectedPrice.toLocaleString()} COP</strong> directamente del usuario. 
-            La comisión del <strong className="font-bold text-amber-950">15% ({currencySymbol}{commission.toLocaleString()} COP)</strong> se descontará automáticamente de tu Tarjeta Virtual una vez el usuario acepte el servicio.
+            La comisión del <strong className="font-bold text-amber-950">8% ({currencySymbol}{commission.toLocaleString()} COP)</strong> se descontará automáticamente de tu Tarjeta Virtual una vez el usuario acepte el servicio.
           </p>
         </div>
 

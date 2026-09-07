@@ -5122,7 +5122,7 @@ export default function App() {
                                     ¿Deseas generar ingresos conduciendo?
                                   </h5>
                                   <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">
-                                    85% Neto
+                                    92% Neto
                                   </span>
                                 </div>
                                 <p className="text-[11px] text-slate-400 font-medium leading-tight mt-0.5">
@@ -6977,18 +6977,18 @@ export default function App() {
                                     </div>
                                   </div>
 
-                                  {/* Precio / Acción con desglose 15% */}
+                                  {/* Precio / Acción con desglose 8% */}
                                   <div className="flex sm:flex-col items-baseline sm:items-end justify-between sm:justify-center gap-2 border-t sm:border-t-0 pt-3 sm:pt-0 border-slate-100 shrink-0">
                                     <div className="text-left sm:text-right">
                                       <div className="flex items-center gap-1.5 justify-start sm:justify-end mb-0.5">
                                         <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider leading-none">Tarifa sugerida</p>
-                                        <span className="text-[8px] font-black bg-rose-100 text-rose-700 px-1 py-0.2 rounded leading-none">Com. 15%</span>
+                                        <span className="text-[8px] font-black bg-rose-100 text-rose-700 px-1 py-0.2 rounded leading-none">Com. 8%</span>
                                       </div>
                                       <p className="text-lg font-black text-emerald-600 bg-emerald-50/60 border border-emerald-100/50 px-3 py-1 rounded-xl">
                                         ${viaje.valor.toLocaleString()}
                                       </p>
                                       <p className="text-[9px] text-slate-500 font-bold mt-1">
-                                        Ganancia neta (85%): <span className="text-emerald-700 font-black">${Math.round(viaje.valor * 0.85).toLocaleString()}</span>
+                                        Ganancia neta (92%): <span className="text-emerald-700 font-black">${Math.round(viaje.valor * 0.92).toLocaleString()}</span>
                                       </p>
                                     </div>
                                     
@@ -10675,7 +10675,7 @@ export default function App() {
                            </div>
                            <div>
                              <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Seguridad Garantizada</p>
-                             <p className="text-[9px] text-emerald-500 font-medium">Recuerda que se aplica una comisión del 15% sobre el valor total.</p>
+                             <p className="text-[9px] text-emerald-500 font-medium">Recuerda que se aplica una comisión del 8% sobre el valor total.</p>
                            </div>
                         </div>
 
@@ -13945,7 +13945,7 @@ export default function App() {
                         <div className="mt-4 bg-rose-500/10 border border-rose-500/20 p-3.5 rounded-[1.5rem] flex items-start gap-2.5">
                           <AlertTriangle size={14} className="text-rose-400 flex-shrink-0 mt-0.5 animate-pulse" />
                           <p className="text-[10px] text-rose-200 leading-relaxed font-medium">
-                            El descuento de la comisión del <strong className="text-white font-black">15%</strong> se realiza automáticamente de tu Tarjeta Virtual cuando el usuario acepta el servicio. Si se realiza una cancelación por cualquier panel, el descuento se mantendrá aplicado <strong className="text-white font-black">sin reembolso</strong>.
+                            El descuento de la comisión del <strong className="text-white font-black">8%</strong> se realiza automáticamente de tu Tarjeta Virtual cuando el usuario acepta el servicio. Si se realiza una cancelación por cualquier panel, el descuento se mantendrá aplicado <strong className="text-white font-black">sin reembolso</strong>.
                           </p>
                         </div>
                       </div>
