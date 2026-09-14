@@ -1,1 +1,30 @@
 @import "tailwindcss";
+
+/* Reglas críticas de Leaflet para contenedores dinámicos */
+.leaflet-container {
+  width: 100% !important;
+  height: 100% !important;
+  z-index: 10 !important;
+  font-family: inherit;
+}
+
+.leaflet-pane {
+  z-index: 20 !important;
+}
+
+.leaflet-tile-pane {
+  z-index: 10 !important;
+}
+
+.leaflet-marker-pane {
+  z-index: 30 !important;
+}
+
+.leaflet-popup-pane {
+  z-index: 40 !important;
+}
+
+.custom-leaflet-pin {
+  background: transparent !important;
+  border: none !important;
+}

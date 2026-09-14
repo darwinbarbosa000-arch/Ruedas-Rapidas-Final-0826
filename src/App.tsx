@@ -450,16 +450,33 @@ export default function App() {
   // --- Detección de link "Compartir Viaje Seguro" (Contacto de confianza) ---
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const urlParams = new URLSearchParams(window.location.search);
-    const trackingId = urlParams.get('viaje_seguro') || urlParams.get('viaje_compartido') || urlParams.get('tracking_id');
-    if (trackingId) {
-      setActiveSharedTripId(trackingId);
-    }
-    if (window.location.hash && window.location.hash.includes('viaje_seguro=')) {
-      const hashParams = new URLSearchParams(window.location.hash.replace('#', '?'));
-      const hId = hashParams.get('viaje_seguro');
-      if (hId) setActiveSharedTripId(hId);
-    }
+
+    const checkTrackingUrl = () => {
+      const search = window.location.search;
+      const hash = window.location.hash;
+      const urlParams = new URLSearchParams(search);
+      let trackingId = urlParams.get('viaje_seguro') || urlParams.get('viaje_compartido') || urlParams.get('tracking_id') || urlParams.get('viajeId');
+      
+      if (!trackingId && hash) {
+        const cleanHash = hash.startsWith('#') ? hash.slice(1) : hash;
+        const queryPart = cleanHash.includes('?') ? cleanHash.split('?')[1] : cleanHash;
+        const hashParams = new URLSearchParams(queryPart);
+        trackingId = hashParams.get('viaje_seguro') || hashParams.get('viaje_compartido') || hashParams.get('tracking_id') || hashParams.get('viajeId');
+      }
+
+      if (trackingId) {
+        setActiveSharedTripId(trackingId);
+      }
+    };
+
+    checkTrackingUrl();
+    window.addEventListener('popstate', checkTrackingUrl);
+    window.addEventListener('hashchange', checkTrackingUrl);
+
+    return () => {
+      window.removeEventListener('popstate', checkTrackingUrl);
+      window.removeEventListener('hashchange', checkTrackingUrl);
+    };
   }, []);
 
   // --- Phone Cleaning Utility ---
@@ -5489,16 +5506,17 @@ export default function App() {
                                          <span className="hidden sm:inline">CANCELAR</span>
                                        </button>
                                      )}
-                                    {/* Botón "Compartir mi ruta segura" por WhatsApp */}
-                                    <div className="pt-1.5 border-t border-slate-200/60">
-                                      <BotonCompartirRutaSegura 
-                                        viaje={viaje} 
-                                        user={user} 
-                                        perfil={perfil} 
-                                        variant="button" 
-                                        onOpenTrackingView={(id) => setActiveSharedTripId(id)} 
-                                      />
-                                    </div>
+                                   </div>
+
+                                   {/* Botón "Compartir mi ruta segura" por WhatsApp */}
+                                   <div className="pt-1 border-t border-slate-200/60 w-full">
+                                     <BotonCompartirRutaSegura 
+                                       viaje={viaje} 
+                                       user={user} 
+                                       perfil={perfil} 
+                                       variant="button" 
+                                       onOpenTrackingView={(id) => setActiveSharedTripId(id)} 
+                                     />
                                    </div>
                                  </div>
                                )}
