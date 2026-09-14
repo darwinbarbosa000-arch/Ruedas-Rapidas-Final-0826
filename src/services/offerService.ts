@@ -86,7 +86,7 @@ export function calculateNationalSuggestedPrice(vehicleType: string, distanceKm:
   } else if (normVehicle === 'taxi') {
     base = 7000;
     por_km = 2200;
-  } else if (normVehicle.includes('camion') || normVehicle.includes('flete') || normVehicle.includes('acarreo')) {
+  } else if (normVehicle.includes('camion') || normVehicle.includes('flete') || normVehicle.includes('acarreo') || normVehicle.includes('motocarro')) {
     base = 12000;
     por_km = 3000;
   }
@@ -194,18 +194,38 @@ export async function submitOffer(params: OfferSubmitParams) {
     distancia_trip
   );
 
-  // VALIDAR BANDA 40%
+  // SERVICIOS ESPECIALES: Flete, Acarreo, Motocarro tienen libertad absoluta de tarifa (sin límites de banda ni tarifas mínimas/máximas)
+  const isSpecialCargo = 
+    ['camion_flete', 'camion_acarreo', 'motocarro'].includes(service_vehicle_type) ||
+    ['camion_flete', 'camion_acarreo', 'motocarro'].includes(serviceData.tipo) ||
+    serviceData.tarifa_libre === true ||
+    serviceData.servicio_especial === true;
+
   const valorPasajero = serviceData.valor || serviceData.precio || serviceData.basePrice || 4000;
   const suggestedPrice = params.suggestedPrice || serviceData.suggestedPrice || precio_sugerido || valorPasajero;
-  const minAllowed = Math.max(4000, Math.round(suggestedPrice * 0.6));
-  const maxAllowed = Math.round(suggestedPrice * 1.4);
+  
+  let minAllowed = 1000;
+  let maxAllowed = 999999999;
 
-  if (price_propuesto < minAllowed || price_propuesto > maxAllowed) {
-    throw new Error(`Oferta fuera de rango ($${formatCOP(minAllowed)} - $${formatCOP(maxAllowed)})`);
-  }
+  if (!isSpecialCargo) {
+    // VALIDAR BANDA 40% para servicios regulares (moto, carro, taxi, etc.)
+    minAllowed = Math.max(4000, Math.round(suggestedPrice * 0.6));
+    maxAllowed = Math.round(suggestedPrice * 1.4);
 
-  if (price_propuesto < 4000) {
-    throw new Error('La tarifa mínima es $4.000');
+    if (price_propuesto < minAllowed || price_propuesto > maxAllowed) {
+      throw new Error(`Oferta fuera de rango ($${formatCOP(minAllowed)} - $${formatCOP(maxAllowed)})`);
+    }
+
+    if (price_propuesto < 4000) {
+      throw new Error('La tarifa mínima es $4.000');
+    }
+  } else {
+    // Para servicios especiales (flete, acarreo, motocarro): libertad total sin ningún límite
+    if (price_propuesto <= 0) {
+      throw new Error('La tarifa propuesta debe ser mayor a $0');
+    }
+    minAllowed = 1000;
+    maxAllowed = Math.max(price_propuesto * 2, 50000000);
   }
 
   // Validaciones Generales de Rango y Distancia de Recogida

@@ -9,19 +9,51 @@ export interface DriverOfferModalProps {
 }
 
 export default function DriverOfferModal({ service, onClose, onSendOffer, driverBalance, onRequestRecharge }: DriverOfferModalProps) {
-  const basePrice = service?.valor || service?.basePrice || 5000;
+  const isSpecialCargo = 
+    ['camion_flete', 'camion_acarreo', 'motocarro'].includes(service?.tipo) ||
+    service?.tarifa_libre === true ||
+    service?.servicio_especial === true;
+
+  const cargoLabel = service?.tipo === 'camion_flete' 
+    ? 'Flete' 
+    : service?.tipo === 'camion_acarreo' 
+      ? 'Acarreo' 
+      : service?.tipo === 'motocarro' 
+        ? 'Moto Carro' 
+        : 'Carga';
+
+  const basePrice = service?.valor || service?.basePrice || (isSpecialCargo ? 0 : 5000);
   const currencySymbol = service?.currencySymbol || '$';
   const commissionRate = 0.08; // 8% de comisión estándar
   
-  const [selectedPrice, setSelectedPrice] = useState(basePrice + 2000);
+  const [selectedPrice, setSelectedPrice] = useState(
+    isSpecialCargo 
+      ? (basePrice > 0 ? basePrice : 45000) 
+      : (basePrice + 2000)
+  );
   const [selectedTime, setSelectedTime] = useState(5);
   
-  const quickPrices = [
-    { label: 'BASE', value: basePrice },
-    { label: '+1000', value: basePrice + 1000 },
-    { label: '+2000', value: basePrice + 2000 },
-    { label: '+5000', value: basePrice + 5000 },
-  ];
+  const quickPrices = isSpecialCargo
+    ? (basePrice > 0
+        ? [
+            { label: 'BASE', value: basePrice },
+            { label: '+10K', value: basePrice + 10000 },
+            { label: '+25K', value: basePrice + 25000 },
+            { label: '+50K', value: basePrice + 50000 },
+          ]
+        : [
+            { label: '30K', value: 30000 },
+            { label: '60K', value: 60000 },
+            { label: '120K', value: 120000 },
+            { label: '250K', value: 250000 },
+          ]
+      )
+    : [
+        { label: 'BASE', value: basePrice },
+        { label: '+1000', value: basePrice + 1000 },
+        { label: '+2000', value: basePrice + 2000 },
+        { label: '+5000', value: basePrice + 5000 },
+      ];
   
   const times = [3, 5, 8, 10, 15];
   const commission = Math.round(selectedPrice * commissionRate);
@@ -37,13 +69,27 @@ export default function DriverOfferModal({ service, onClose, onSendOffer, driver
         {/* HEADER */}
         <div className="flex justify-between items-center mb-4 pb-3 border-b border-slate-100">
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <span className="text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-md">
                 Comisión 8%
               </span>
-              <p className="text-xs text-slate-500 font-medium">Tarifa del pasajero</p>
+              {isSpecialCargo ? (
+                <span className="text-[10px] font-black uppercase tracking-wider bg-orange-100 text-orange-800 px-2 py-0.5 rounded-md">
+                  {cargoLabel}
+                </span>
+              ) : (
+                <p className="text-xs text-slate-500 font-medium">Tarifa del pasajero</p>
+              )}
             </div>
-            <p className="text-2xl font-black text-slate-900 mt-0.5">{currencySymbol} {basePrice.toLocaleString()} <span className="text-xs font-bold text-slate-400">COP</span></p>
+            <p className="text-2xl font-black text-slate-900 mt-1">
+              {basePrice > 0 ? (
+                <>
+                  {currencySymbol} {basePrice.toLocaleString()} <span className="text-xs font-bold text-slate-400">COP</span>
+                </>
+              ) : (
+                <span className="text-orange-600 text-lg uppercase tracking-tight">Tarifa a convenir</span>
+              )}
+            </p>
           </div>
           <button 
             type="button"
@@ -57,7 +103,11 @@ export default function DriverOfferModal({ service, onClose, onSendOffer, driver
 
         {/* SECCIÓN 1: AJUSTA TU PRECIO */}
         <div className="mb-4">
-          <p className="text-xs font-bold uppercase tracking-wider mb-2 text-slate-700">¿Cuánto ofreces al pasajero?</p>
+          <div className="flex justify-between items-center mb-2">
+            <p className="text-xs font-bold uppercase tracking-wider text-slate-700">
+              {isSpecialCargo ? `¿Cuánto vas a cobrar por este ${cargoLabel}?` : '¿Cuánto ofreces al pasajero?'}
+            </p>
+          </div>
           <div className="grid grid-cols-4 gap-2 mb-3">
             {quickPrices.map((p, pIdx) => (
               <button 
@@ -71,7 +121,7 @@ export default function DriverOfferModal({ service, onClose, onSendOffer, driver
                 }`}
               >
                 <p className="text-[10px] text-slate-500 font-bold uppercase">{p.label}</p>
-                <p className="font-black text-sm">{currencySymbol} {p.value.toLocaleString()}</p>
+                <p className="font-black text-xs sm:text-sm">{currencySymbol} {p.value.toLocaleString()}</p>
               </button>
             ))}
           </div>
@@ -81,8 +131,8 @@ export default function DriverOfferModal({ service, onClose, onSendOffer, driver
             <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-black text-emerald-600 select-none">{currencySymbol}</span>
             <input 
               type="number"
-              step="500"
-              min="4000"
+              step={isSpecialCargo ? "1000" : "500"}
+              min={isSpecialCargo ? "1" : "4000"}
               value={selectedPrice || ''}
               onChange={(e) => setSelectedPrice(Number(e.target.value) || 0)}
               placeholder="Ingresa tu tarifa"
@@ -116,7 +166,7 @@ export default function DriverOfferModal({ service, onClose, onSendOffer, driver
         {/* UI DESGLOSE DE COMISIÓN (8%) Y GANANCIA NETA */}
         <div className="bg-slate-50/80 border border-slate-200/80 rounded-2xl p-4 mb-4 space-y-2.5">
           <div className="flex justify-between items-center text-xs">
-            <span className="text-slate-600 font-medium">Cobro total al pasajero:</span>
+            <span className="text-slate-600 font-medium">Cobro total al usuario:</span>
             <span className="font-black text-base text-slate-900">{currencySymbol} {totalToCollect.toLocaleString()} COP</span>
           </div>
           
@@ -174,9 +224,9 @@ export default function DriverOfferModal({ service, onClose, onSendOffer, driver
         <button 
           type="button"
           onClick={() => onSendOffer(selectedPrice, selectedTime)}
-          disabled={!hasEnoughBalance || selectedPrice < 4000}
+          disabled={!hasEnoughBalance || (isSpecialCargo ? selectedPrice <= 0 : selectedPrice < 4000)}
           className={`w-full font-black text-xs uppercase tracking-wider py-4 rounded-2xl flex items-center justify-center gap-2 transition-all cursor-pointer shadow-lg ${
-            !hasEnoughBalance || selectedPrice < 4000
+            !hasEnoughBalance || (isSpecialCargo ? selectedPrice <= 0 : selectedPrice < 4000)
             ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
             : 'bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white shadow-emerald-200 hover:shadow-emerald-300'
           }`}

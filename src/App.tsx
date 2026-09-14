@@ -46,6 +46,8 @@ import { MapComponent, MapPoint } from './components/MapComponent';
 import { AdminDriversPanel } from './components/AdminDriversPanel';
 import DriverOfferModal from './components/DriverOfferModal';
 import RegistroConductor from './components/RegistroConductor';
+import { ViajeSeguroCompartido } from './components/ViajeSeguroCompartido';
+import { BotonCompartirRutaSegura } from './components/BotonCompartirRutaSegura';
 
 const GOOGLE_MAPS_LIBRARIES: ("places")[] = ['places'];
 
@@ -443,6 +445,22 @@ export default function App() {
   const [notifiedRecharges, setNotifiedRecharges] = useState<Set<string>>(new Set());
   const [unreadMessages, setUnreadMessages] = useState<{ [viajeId: string]: number }>({});
   const [lastSeenMsgCount, setLastSeenMsgCount] = useState<{ [viajeId: string]: number }>({});
+  const [activeSharedTripId, setActiveSharedTripId] = useState<string | null>(null);
+
+  // --- Detección de link "Compartir Viaje Seguro" (Contacto de confianza) ---
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const urlParams = new URLSearchParams(window.location.search);
+    const trackingId = urlParams.get('viaje_seguro') || urlParams.get('viaje_compartido') || urlParams.get('tracking_id');
+    if (trackingId) {
+      setActiveSharedTripId(trackingId);
+    }
+    if (window.location.hash && window.location.hash.includes('viaje_seguro=')) {
+      const hashParams = new URLSearchParams(window.location.hash.replace('#', '?'));
+      const hId = hashParams.get('viaje_seguro');
+      if (hId) setActiveSharedTripId(hId);
+    }
+  }, []);
 
   // --- Phone Cleaning Utility ---
   const cleanPhone = (phone: string | undefined | null) => {
@@ -3457,8 +3475,10 @@ export default function App() {
           destinoCoords: resolvedDestinoCoords,
         },
         valor: isCargo ? 0 : tripRequestData.valor,
+        tarifa_libre: isCargo,
+        servicio_especial: isCargo,
         capacidad_carga: isCargo ? (tripRequestData.capacidad_carga || '') : '',
-        saldo_promo_usuario: isCargo ? 0 : (perfil.saldo_promo || 0), // No aplica saldo promo para fletes de cotización libre
+        saldo_promo_usuario: isCargo ? 0 : (perfil.saldo_promo || 0), // No aplica saldo promo para servicios de carga con cotización directa
         estado: 'solicitado',
         ciudad: perfil.ciudad || 'Fusagasugá',
         usuarioCiudad: perfil.ciudad || 'Fusagasugá',
@@ -3499,7 +3519,8 @@ export default function App() {
     } else if (type === 'marcas_aliadas') {
       setDomicilioTab('aliados');
     }
-    setTripRequestData({ origen: '', destino: '', valor: 5000, capacidad_carga: '' });
+    const isCargoType = type === 'camion_flete' || type === 'camion_acarreo' || type === 'motocarro';
+    setTripRequestData({ origen: '', destino: '', valor: isCargoType ? 0 : 5000, capacidad_carga: '' });
     setShowTripRequestModal(true);
 
     if (navigator.geolocation) {
@@ -4249,8 +4270,14 @@ export default function App() {
     const finalValue = customPrice !== undefined ? customPrice : offerValue;
     const finalTime = customTime !== undefined ? customTime : arrivalETA;
 
-    if (finalValue < 4000) {
+    const isSpecialCargo = ['camion_flete', 'camion_acarreo', 'motocarro'].includes(selectedTripForOffer.tipo) || selectedTripForOffer.tarifa_libre || selectedTripForOffer.servicio_especial;
+
+    if (!isSpecialCargo && finalValue < 4000) {
       toast.error("La tarifa mínima es $4.000");
+      return;
+    }
+    if (isSpecialCargo && finalValue <= 0) {
+      toast.error("Por favor ingresa una tarifa válida mayor a $0");
       return;
     }
 
@@ -5358,25 +5385,15 @@ export default function App() {
                                  </div>
                                )}
 
-                               {viaje.estado === 'en_transito' && (
-                                 <div className="w-full space-y-3">
-                                   <div className="p-3.5 bg-gradient-to-r from-emerald-600 to-teal-700 text-white rounded-2xl shadow-md border border-emerald-500/30 flex items-center gap-3">
-                                     <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center shrink-0 text-lg font-bold shadow-inner">
-                                       🚖
-                                     </div>
-                                     <div className="text-left min-w-0">
-                                       <span className="text-[9px] font-black uppercase tracking-wider text-emerald-200 block">Servicio en Curso</span>
-                                       <p className="text-xs font-bold text-white truncate">¡En trayecto! Tu conductor {viaje.conductorNombre || ''} te lleva al destino.</p>
-                                     </div>
-                                   </div>
-                                   <div className="w-full h-auto rounded-[1.5rem] overflow-hidden border border-slate-100 shadow-xs">
-                                     <TripStatusAnimation 
-                                       status={viaje.estado} 
-                                       role="pasajero" 
-                                     />
-                                   </div>
-                                 </div>
-                               )}
+                                {viaje.estado === 'en_transito' && (
+                                  <BotonCompartirRutaSegura 
+                                    viaje={viaje} 
+                                    user={user} 
+                                    perfil={perfil} 
+                                    variant="banner" 
+                                    onOpenTrackingView={(id) => setActiveSharedTripId(id)} 
+                                  />
+                                )}
 
                                {/* 2. TARJETA COMPACTA DE INFORMACIÓN Y CONTACTO DEL CONDUCTOR */}
                                {(viaje.estado === 'aceptado' || viaje.estado === 'en_camino' || viaje.estado === 'llegando' || viaje.estado === 'en_transito') && (
@@ -5472,6 +5489,16 @@ export default function App() {
                                          <span className="hidden sm:inline">CANCELAR</span>
                                        </button>
                                      )}
+                                    {/* Botón "Compartir mi ruta segura" por WhatsApp */}
+                                    <div className="pt-1.5 border-t border-slate-200/60">
+                                      <BotonCompartirRutaSegura 
+                                        viaje={viaje} 
+                                        user={user} 
+                                        perfil={perfil} 
+                                        variant="button" 
+                                        onOpenTrackingView={(id) => setActiveSharedTripId(id)} 
+                                      />
+                                    </div>
                                    </div>
                                  </div>
                                )}
@@ -6979,18 +7006,35 @@ export default function App() {
 
                                   {/* Precio / Acción con desglose 8% */}
                                   <div className="flex sm:flex-col items-baseline sm:items-end justify-between sm:justify-center gap-2 border-t sm:border-t-0 pt-3 sm:pt-0 border-slate-100 shrink-0">
-                                    <div className="text-left sm:text-right">
-                                      <div className="flex items-center gap-1.5 justify-start sm:justify-end mb-0.5">
-                                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider leading-none">Tarifa sugerida</p>
-                                        <span className="text-[8px] font-black bg-rose-100 text-rose-700 px-1 py-0.2 rounded leading-none">Com. 8%</span>
-                                      </div>
-                                      <p className="text-lg font-black text-emerald-600 bg-emerald-50/60 border border-emerald-100/50 px-3 py-1 rounded-xl">
-                                        ${viaje.valor.toLocaleString()}
-                                      </p>
-                                      <p className="text-[9px] text-slate-500 font-bold mt-1">
-                                        Ganancia neta (92%): <span className="text-emerald-700 font-black">${Math.round(viaje.valor * 0.92).toLocaleString()}</span>
-                                      </p>
-                                    </div>
+                                    {(() => {
+                                      const isCargoFeed = ['camion_flete', 'camion_acarreo', 'motocarro'].includes(viaje.tipo) || viaje.tarifa_libre || viaje.servicio_especial;
+                                      return (
+                                        <div className="text-left sm:text-right">
+                                          <div className="flex items-center gap-1.5 justify-start sm:justify-end mb-0.5">
+                                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider leading-none">
+                                              {isCargoFeed ? (viaje.valor > 0 ? 'Tarifa propuesta' : 'Cotización') : 'Tarifa sugerida'}
+                                            </p>
+                                            <span className="text-[8px] font-black bg-rose-100 text-rose-700 px-1 py-0.2 rounded leading-none">Com. 8%</span>
+                                          </div>
+                                          {isCargoFeed && (!viaje.valor || viaje.valor === 0) ? (
+                                            <p className="text-sm font-black text-orange-600 bg-orange-50 border border-orange-200/60 px-3 py-1.5 rounded-xl uppercase tracking-tight">
+                                              Por Cotizar
+                                            </p>
+                                          ) : (
+                                            <p className="text-lg font-black text-emerald-600 bg-emerald-50/60 border border-emerald-100/50 px-3 py-1 rounded-xl">
+                                              ${viaje.valor.toLocaleString()}
+                                            </p>
+                                          )}
+                                          <p className="text-[9px] text-slate-500 font-bold mt-1">
+                                            {isCargoFeed && (!viaje.valor || viaje.valor === 0) ? (
+                                              <span className="text-slate-500 font-bold">Comisión 8% al aceptar</span>
+                                            ) : (
+                                              <>Ganancia neta (92%): <span className="text-emerald-700 font-black">${Math.round(viaje.valor * 0.92).toLocaleString()}</span></>
+                                            )}
+                                          </p>
+                                        </div>
+                                      );
+                                    })()}
                                     
                                     <div className="flex gap-2">
                                       {(viaje.estado === 'solicitado' || viaje.estado === 'negociando') && (!viaje.ofertas || !viaje.ofertas[user.uid]) && (
@@ -10355,25 +10399,25 @@ export default function App() {
                             </div>
                           </div>
 
-                          {/* Info Banner */}
-                          <div className="bg-orange-50 p-4 rounded-2xl border border-orange-100/50 flex justify-between items-center text-left">
-                            <div className="flex items-center gap-3">
-                              <div className="w-9 h-9 bg-orange-100 rounded-xl flex items-center justify-center text-orange-600">
-                                <CreditCard size={18} />
-                              </div>
-                              <div>
-                                <span className="text-[10px] font-black text-slate-800 uppercase leading-none block mb-0.5">Flete por Cotizar</span>
-                                <p className="text-[8px] text-slate-400 font-medium leading-tight max-w-[190px]">Los conductores registrados en tu ciudad te enviarán ofertas en tiempo real y tú eliges la mejor.</p>
-                              </div>
+                          {/* Información directa de cotización */}
+                          <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-100 flex items-center gap-3 text-left">
+                            <div className="w-10 h-10 bg-orange-100 text-orange-600 rounded-xl flex items-center justify-center shrink-0">
+                              <Truck size={20} />
+                            </div>
+                            <div>
+                              <span className="text-[11px] font-black text-slate-800 uppercase tracking-tight block">Cotización Directa con Conductor</span>
+                              <p className="text-[10px] text-slate-500 font-medium leading-tight">
+                                Los conductores disponibles recibirán tu solicitud y te enviarán su valor a cobrar en tiempo real. Tú eliges la mejor opción.
+                              </p>
                             </div>
                           </div>
 
                           <button 
                             type="submit"
-                            className="w-full bg-orange-600 text-white py-4 rounded-2xl font-black text-xs uppercase tracking-wider shadow-lg shadow-orange-100 hover:bg-orange-700 transition-all active:scale-95 mt-4 flex items-center justify-center gap-2"
+                            className="w-full bg-orange-600 text-white py-4 rounded-2xl font-black text-xs uppercase tracking-wider shadow-lg shadow-orange-100 hover:bg-orange-700 transition-all active:scale-95 mt-4 flex items-center justify-center gap-2 cursor-pointer"
                           >
                             <Truck size={16} />
-                            Solicitar Cotización de Carga
+                            Solicitar Servicio de Carga
                           </button>
                         </form>
                       ) : (
@@ -10732,68 +10776,83 @@ export default function App() {
                             <Truck size={24} />
                           </div>
                           <div>
-                            <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">Servicios de Carga</h3>
+                            <div className="flex flex-wrap items-center gap-1.5 mb-1">
+                              <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">Servicios de Carga</h3>
+                              <span className="bg-emerald-100 text-emerald-800 text-[9px] font-black px-2 py-0.5 rounded-md uppercase tracking-wider">Comisión 8%</span>
+                            </div>
                             <p className="text-slate-400 text-[10px] font-black uppercase tracking-wider">Selecciona tu tipo de carga</p>
                           </div>
                         </div>
                       </div>
 
                       <div className="space-y-3">
+                        {/* 1. FLETE */}
                         <button
                           onClick={() => {
                             setShowCargoSelector(false);
                             openTripRequest('camion_flete');
                           }}
-                          className="w-full text-left p-4 rounded-2xl border border-slate-100 bg-white hover:border-orange-500 hover:shadow-md transition-all group flex items-center justify-between cursor-pointer"
+                          className="w-full text-left p-4 rounded-2xl border-2 border-slate-100 bg-white hover:border-orange-500 hover:shadow-md transition-all group flex items-center justify-between cursor-pointer"
                         >
-                          <div className="flex items-center gap-4">
+                          <div className="flex items-center gap-3.5">
                             <div className="p-3 bg-orange-50 text-orange-600 rounded-xl group-hover:bg-orange-100 transition-colors">
                               <Truck size={22} />
                             </div>
                             <div>
-                              <p className="text-sm font-black text-slate-800 uppercase tracking-tight">Flete</p>
+                              <div className="flex items-center gap-2 mb-0.5">
+                                <p className="text-sm font-black text-slate-800 uppercase tracking-tight">Flete</p>
+                                <span className="bg-emerald-100 text-emerald-800 text-[8px] font-black px-1.5 py-0.2 rounded uppercase">Com. 8%</span>
+                              </div>
                               <p className="text-xs text-slate-500">Para cargas pesadas y largas distancias</p>
                             </div>
                           </div>
-                          <ChevronRight className="text-slate-400 group-hover:text-orange-500 transition-colors" size={18} />
+                          <ChevronRight className="text-slate-400 group-hover:text-orange-500 transition-colors shrink-0" size={18} />
                         </button>
 
+                        {/* 2. ACARREO */}
                         <button
                           onClick={() => {
                             setShowCargoSelector(false);
                             openTripRequest('camion_acarreo');
                           }}
-                          className="w-full text-left p-4 rounded-2xl border border-slate-100 bg-white hover:border-orange-500 hover:shadow-md transition-all group flex items-center justify-between cursor-pointer"
+                          className="w-full text-left p-4 rounded-2xl border-2 border-slate-100 bg-white hover:border-orange-500 hover:shadow-md transition-all group flex items-center justify-between cursor-pointer"
                         >
-                          <div className="flex items-center gap-4">
+                          <div className="flex items-center gap-3.5">
                             <div className="p-3 bg-orange-50 text-orange-600 rounded-xl group-hover:bg-orange-100 transition-colors">
                               <Truck size={22} />
                             </div>
                             <div>
-                              <p className="text-sm font-black text-slate-800 uppercase tracking-tight">Acarreo</p>
+                              <div className="flex items-center gap-2 mb-0.5">
+                                <p className="text-sm font-black text-slate-800 uppercase tracking-tight">Acarreo</p>
+                                <span className="bg-emerald-100 text-emerald-800 text-[8px] font-black px-1.5 py-0.2 rounded uppercase">Com. 8%</span>
+                              </div>
                               <p className="text-xs text-slate-500">Ideal para mudanzas y trasteos locales</p>
                             </div>
                           </div>
-                          <ChevronRight className="text-slate-400 group-hover:text-orange-500 transition-colors" size={18} />
+                          <ChevronRight className="text-slate-400 group-hover:text-orange-500 transition-colors shrink-0" size={18} />
                         </button>
 
+                        {/* 3. MOTO CARRO */}
                         <button
                           onClick={() => {
                             setShowCargoSelector(false);
                             openTripRequest('motocarro');
                           }}
-                          className="w-full text-left p-4 rounded-2xl border border-slate-100 bg-white hover:border-orange-500 hover:shadow-md transition-all group flex items-center justify-between cursor-pointer"
+                          className="w-full text-left p-4 rounded-2xl border-2 border-slate-100 bg-white hover:border-orange-500 hover:shadow-md transition-all group flex items-center justify-between cursor-pointer"
                         >
-                          <div className="flex items-center gap-4">
+                          <div className="flex items-center gap-3.5">
                             <div className="p-3 bg-orange-50 text-orange-600 rounded-xl group-hover:bg-orange-100 transition-colors">
                               <Truck size={22} />
                             </div>
                             <div>
-                              <p className="text-sm font-black text-slate-800 uppercase tracking-tight">Moto Carro</p>
+                              <div className="flex items-center gap-2 mb-0.5">
+                                <p className="text-sm font-black text-slate-800 uppercase tracking-tight">Moto Carro</p>
+                                <span className="bg-emerald-100 text-emerald-800 text-[8px] font-black px-1.5 py-0.2 rounded uppercase">Com. 8%</span>
+                              </div>
                               <p className="text-xs text-slate-500">Cargas ligeras y entregas rápidas</p>
                             </div>
                           </div>
-                          <ChevronRight className="text-slate-400 group-hover:text-orange-500 transition-colors" size={18} />
+                          <ChevronRight className="text-slate-400 group-hover:text-orange-500 transition-colors shrink-0" size={18} />
                         </button>
                       </div>
                     </div>
@@ -14704,6 +14763,16 @@ export default function App() {
           </div>
         )}
       </AnimatePresence>
+
+      {/* Modal de Viaje Seguro Compartido (Flujo Contacto de Confianza) */}
+      {activeSharedTripId && (
+        <ViajeSeguroCompartido
+          viajeId={activeSharedTripId}
+          currentUser={user}
+          onClose={() => setActiveSharedTripId(null)}
+          onRequestOpenLogin={() => setShowEmailLogin(true)}
+        />
+      )}
       </ErrorBoundary>
     </MapProvider>
   );

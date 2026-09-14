@@ -2,6 +2,7 @@ import { doc, runTransaction, serverTimestamp, collection, addDoc, setDoc, getDo
 import { db, auth } from '../firebase';
 import { getSyncedISOString } from './clockService';
 import { submitOffer, acceptOffer } from './offerService';
+import { marcarViajeCompartidoFinalizado } from './viajeCompartidoService';
 
 export enum OperationType {
   CREATE = 'create',
@@ -234,6 +235,9 @@ export async function actualizarEstadoViaje(viajeId: string, nuevoEstado: string
       estado: nuevoEstado,
       [`fecha_${nuevoEstado}`]: getSyncedISOString()
     });
+    if (nuevoEstado === 'finalizado') {
+      await marcarViajeCompartidoFinalizado(viajeId);
+    }
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, `viajes/${viajeId}`);
   }
@@ -356,6 +360,7 @@ export async function finalizarViaje(viajeId: string, usuarioId: string, valor: 
         fecha_finalizacion: getSyncedISOString()
       });
     });
+    await marcarViajeCompartidoFinalizado(viajeId);
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, `viajes/${viajeId}`);
   }

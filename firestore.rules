@@ -92,6 +92,10 @@ service cloud.firestore {
       }
     }
 
+    match /viajes_compartidos/{shareId} {
+      allow read, write: if true;
+    }
+
     match /services/{serviceId} {
       allow read, write: if true;
     }
