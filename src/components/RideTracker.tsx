@@ -17,6 +17,7 @@ interface RideTrackerProps {
   vehicleType?: string;
   passengerPoint?: RidePoint | null;
   destinationPoint?: RidePoint | null;
+  status?: string;
 }
 
 export const RideTracker: React.FC<RideTrackerProps> = ({
@@ -25,6 +26,7 @@ export const RideTracker: React.FC<RideTrackerProps> = ({
   vehicleType,
   passengerPoint = null,
   destinationPoint = null,
+  status,
 }) => {
   const [driverLocation, setDriverLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
@@ -63,8 +65,9 @@ export const RideTracker: React.FC<RideTrackerProps> = ({
   }, [driverId]);
 
   // Distancia y Tiempo Estimado de Llegada (ETA del conductor al objetivo: destino si va en tránsito, o punto de recogida)
-  const isEnTransito = !!(destinationPoint && isValidPos(destinationPoint));
-  const targetPoint = isEnTransito ? destinationPoint : passengerPoint;
+  const isEnTransito = status === 'en_transito' || (status !== 'aceptado' && status !== 'en_camino' && status !== 'llegando' && !!(destinationPoint && isValidPos(destinationPoint)));
+  const isLlegando = status === 'llegando';
+  const targetPoint = isEnTransito ? (isValidPos(destinationPoint) ? destinationPoint : passengerPoint) : passengerPoint;
   const targetLat = targetPoint?.lat;
   const targetLng = targetPoint?.lng;
 
@@ -92,6 +95,8 @@ export const RideTracker: React.FC<RideTrackerProps> = ({
       ? driverLocation
       : passengerPoint && typeof passengerPoint.lat === 'number' && typeof passengerPoint.lng === 'number'
       ? { lat: passengerPoint.lat, lng: passengerPoint.lng }
+      : destinationPoint && typeof destinationPoint.lat === 'number' && typeof destinationPoint.lng === 'number'
+      ? { lat: destinationPoint.lat, lng: destinationPoint.lng }
       : FUSAGASUGA_CENTER;
 
   const validOrigen =
@@ -116,7 +121,11 @@ export const RideTracker: React.FC<RideTrackerProps> = ({
             </span>
             <span className="font-extrabold text-xs tracking-tight text-emerald-400 truncate">
               {driverName ? `Conductor ${driverName}` : 'Conductor'}{' '}
-              {isEnTransito ? 'en trayecto a tu destino' : 'en camino a tu ubicación'}
+              {isEnTransito 
+                ? 'en trayecto a tu destino' 
+                : isLlegando 
+                ? 'ha llegado al punto de recogida' 
+                : 'en camino a tu ubicación'}
             </span>
           </div>
           <span className="text-[9px] font-mono text-emerald-300 bg-emerald-950/80 px-2 py-0.5 rounded-md border border-emerald-500/30 shrink-0">
@@ -132,10 +141,10 @@ export const RideTracker: React.FC<RideTrackerProps> = ({
             </div>
             <div className="min-w-0">
               <span className="text-[9px] font-black uppercase text-emerald-300 tracking-wider block leading-none">
-                Llegada Est.
+                {isEnTransito ? 'Llegada Destino' : isLlegando ? 'En el punto' : 'Llegada Est.'}
               </span>
               <p className="text-sm sm:text-base font-black text-white font-mono leading-tight mt-0.5">
-                ~{etaMins} <span className="text-[10px] font-sans font-bold text-emerald-300">min</span>
+                {isLlegando && !isEnTransito ? '¡Aquí!' : `~${etaMins}`} {!(isLlegando && !isEnTransito) && <span className="text-[10px] font-sans font-bold text-emerald-300">min</span>}
               </p>
             </div>
           </div>

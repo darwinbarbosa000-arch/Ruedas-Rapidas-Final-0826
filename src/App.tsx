@@ -5378,18 +5378,19 @@ export default function App() {
                             )}
 
                              <div className="flex flex-col gap-3 w-full mt-3">
-                               {/* 1. MAPA DE SEGUIMIENTO EN TIEMPO REAL (SOLO HASTA LLEGAR / EN CAMINO) */}
-                               {(viaje.estado === 'aceptado' || viaje.estado === 'en_camino' || viaje.estado === 'llegando') && (
+                               {/* 1. MAPA DE SEGUIMIENTO EN TIEMPO REAL DURANTE TODO EL SERVICIO HASTA FINALIZAR */}
+                               {(viaje.estado === 'aceptado' || viaje.estado === 'en_camino' || viaje.estado === 'llegando' || viaje.estado === 'en_transito') && (
                                  <div className="w-full space-y-3">
                                    {(() => {
-                                     const { origen } = getTripRoutePoints(viaje);
+                                     const { origen, destino } = getTripRoutePoints(viaje);
                                      return (
                                        <RideTracker
                                          driverId={viaje.conductorId}
                                          driverName={viaje.conductorNombre}
                                          vehicleType={viaje.tipo || viaje.conductorVehiculo?.tipo}
                                          passengerPoint={origen}
-                                         destinationPoint={null}
+                                         destinationPoint={destino}
+                                         status={viaje.estado}
                                        />
                                      );
                                    })()}
