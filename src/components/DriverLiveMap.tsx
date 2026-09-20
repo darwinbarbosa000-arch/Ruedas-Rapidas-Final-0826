@@ -13,6 +13,7 @@ interface DriverLiveMapProps {
   origen?: { lat: number; lng: number; address?: string } | null;
   destino?: { lat: number; lng: number; address?: string } | null;
   showRoute?: boolean;
+  status?: string;
 }
 
 export const DriverLiveMap: React.FC<DriverLiveMapProps> = ({
@@ -23,6 +24,7 @@ export const DriverLiveMap: React.FC<DriverLiveMapProps> = ({
   origen = null,
   destino = null,
   showRoute = false,
+  status,
 }) => {
   const [position, setPosition] = useState<{ lat: number; lng: number }>(FUSAGASUGA_CENTER);
   const [geoError, setGeoError] = useState<string | null>(null);
@@ -142,10 +144,12 @@ export const DriverLiveMap: React.FC<DriverLiveMapProps> = ({
     };
   }, [saveLocationToFirestore]);
 
-  // Distancia del conductor al punto de recogida (si existe un viaje en curso)
-  const distanceToPickup =
-    origen && isValidPos(origen) && isValidPos(position)
-      ? calculateHaversineKm(position, origen)
+  // Distancia del conductor al objetivo: destino si va en tránsito, o punto de recogida si va hacia el pasajero
+  const isEnTransito = status === 'en_transito';
+  const targetPoint = isEnTransito ? (destino || origen) : (origen || destino);
+  const distanceToTarget =
+    targetPoint && isValidPos(targetPoint) && isValidPos(position)
+      ? calculateHaversineKm(position, targetPoint)
       : null;
 
   return (
@@ -171,12 +175,14 @@ export const DriverLiveMap: React.FC<DriverLiveMapProps> = ({
       <div className="flex flex-wrap items-center justify-between bg-slate-900 text-white p-3 rounded-2xl text-xs font-semibold gap-2 shadow-sm">
         <div className="flex items-center gap-2">
           <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse border-2 border-slate-900"></span>
-          <span>Rastreo GPS en Tiempo Real • {driverName}</span>
+          <span>
+            {isEnTransito ? 'Ruta a Destino en Vivo' : 'Rastreo GPS en Tiempo Real'} • {driverName}
+          </span>
         </div>
         <div className="flex items-center gap-2">
-          {distanceToPickup !== null && (
+          {distanceToTarget !== null && (
             <span className="text-[11px] font-bold text-emerald-400 bg-emerald-950/80 border border-emerald-500/30 px-2 py-0.5 rounded-lg">
-              📍 {distanceToPickup} km al pasajero
+              📍 {distanceToTarget} km {isEnTransito ? 'al destino' : 'al pasajero'}
             </span>
           )}
           <span className="text-[10px] text-slate-300 font-mono">

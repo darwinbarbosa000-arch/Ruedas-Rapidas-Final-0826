@@ -430,7 +430,7 @@ export default function App() {
     departamento: 'Cundinamarca',
     ciudad: 'Fusagasugá'
   });
-  const [emailAuthMode, setEmailAuthMode] = useState<'login' | 'register'>('register');
+  const [emailAuthMode, setEmailAuthMode] = useState<'login' | 'register'>('login');
   const [phoneAuthSubMode, setPhoneAuthSubMode] = useState<'register' | 'login'>('register');
   const [isEmailProcessing, setIsEmailProcessing] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
@@ -2967,7 +2967,7 @@ export default function App() {
       if (error.code === 'auth/popup-closed-by-user') {
         toast.info("Inicio de sesión cancelado.");
       } else if (error.code === 'auth/popup-blocked') {
-        toast.error("El navegador bloqueó la ventana emergente. Puedes usar el acceso rápido o ingresar por SMS.");
+        toast.error("El navegador bloqueó la ventana emergente de Google. Puedes ingresar con tu correo electrónico y contraseña.");
       } else if (
         error.code === 'auth/internal-error' || 
         error.code === 'auth/operation-not-allowed' ||
@@ -3295,7 +3295,7 @@ export default function App() {
           { duration: 10000 }
         );
       } else if (error.code === 'auth/internal-error' || (error.message && error.message.includes('internal-error'))) {
-        toast.error("Error interno del servicio de autenticación. Te sugerimos registrarte mediante tu número celular.", { duration: 8000 });
+        toast.error("Error temporal del servicio de autenticación. Por favor intenta de nuevo o ingresa con Google.", { duration: 8000 });
       } else {
         toast.error(`Error de registro: ${error.message || error}`);
       }
@@ -4616,25 +4616,21 @@ export default function App() {
                 </p>
               </div>
 
-              {/* Selector de pestañas de autenticación */}
+              {/* Selector de pestañas de autenticación: Iniciar Sesión vs Registro con Correo */}
               <div className="grid grid-cols-2 p-1.5 bg-black/20 rounded-2xl border border-white/10 text-xs font-bold uppercase tracking-wider mb-2">
                 <button
                   type="button"
-                  onClick={() => {
-                    setEmailAuthMode('register');
-                  }}
-                  className={`py-2.5 rounded-xl transition-all duration-300 ${emailAuthMode === 'register' ? 'bg-white text-emerald-800 shadow-md' : 'text-white/70 hover:text-white hover:bg-white/5'}`}
+                  onClick={() => setEmailAuthMode('login')}
+                  className={`py-2.5 rounded-xl transition-all duration-300 ${emailAuthMode === 'login' ? 'bg-white text-emerald-800 shadow-md' : 'text-white/70 hover:text-white hover:bg-white/5'}`}
                 >
-                  Teléfono (SMS)
+                  Iniciar Sesión
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    setEmailAuthMode('login');
-                  }}
-                  className={`py-2.5 rounded-xl transition-all duration-300 ${emailAuthMode === 'login' ? 'bg-white text-emerald-800 shadow-md' : 'text-white/70 hover:text-white hover:bg-white/5'}`}
+                  onClick={() => setEmailAuthMode('register')}
+                  className={`py-2.5 rounded-xl transition-all duration-300 ${emailAuthMode === 'register' ? 'bg-white text-emerald-800 shadow-md' : 'text-white/70 hover:text-white hover:bg-white/5'}`}
                 >
-                  Google / Correo
+                  Registrarme
                 </button>
               </div>
 
@@ -4642,7 +4638,7 @@ export default function App() {
                 <div className="space-y-6">
                   {/* Google Login Section */}
                   <div className="space-y-3">
-                    <p className="text-xs text-white/70 font-bold uppercase tracking-widest text-left px-1">Acceso Rápido y Seguro</p>
+                    <p className="text-xs text-white/70 font-bold uppercase tracking-widest text-left px-1">Ingreso con cuenta Google</p>
                     <button
                       onClick={handleLogin}
                       disabled={isLoggingIn}
@@ -4674,7 +4670,7 @@ export default function App() {
                         value={emailForm.email}
                         onChange={(e) => setEmailForm({ ...emailForm, email: e.target.value })}
                         placeholder="correo@ejemplo.com"
-                        className="w-full bg-black/20 border border-white/10 focus:border-emerald-400 rounded-2xl p-3 text-sm text-white placeholder-white/30 focus:outline-none transition-all"
+                        className="w-full bg-black/20 border border-white/10 focus:border-emerald-400 rounded-2xl p-3.5 text-sm text-white placeholder-white/30 focus:outline-none transition-all"
                       />
                     </div>
 
@@ -4686,7 +4682,7 @@ export default function App() {
                         value={emailForm.password}
                         onChange={(e) => setEmailForm({ ...emailForm, password: e.target.value })}
                         placeholder="Ingresa tu contraseña"
-                        className="w-full bg-black/20 border border-white/10 focus:border-emerald-400 rounded-2xl p-3 text-sm text-white placeholder-white/30 focus:outline-none transition-all"
+                        className="w-full bg-black/20 border border-white/10 focus:border-emerald-400 rounded-2xl p-3.5 text-sm text-white placeholder-white/30 focus:outline-none transition-all"
                       />
                     </div>
 
@@ -4700,151 +4696,213 @@ export default function App() {
                       )}
                       Ingresar de Forma Segura
                     </button>
+
+                    <div className="text-center pt-2">
+                      <button
+                        type="button"
+                        onClick={() => setEmailAuthMode('register')}
+                        className="text-xs text-white/70 hover:text-white underline font-semibold transition-colors"
+                      >
+                        ¿Aún no tienes cuenta? Regístrate con tu correo
+                      </button>
+                    </div>
                   </form>
                 </div>
               ) : (
-                /* Phone SMS Registration Section (Paso 1 y Paso 2) */
+                /* Registration with Email Form */
                 <div className="space-y-4 text-left">
-                  {phoneStep === 1 ? (
-                    /* Paso 1: Input de teléfono + Botón "Enviar código" */
-                    <form onSubmit={handleRequestPhoneOTP} className="space-y-4">
-                      {/* Selector de Crear Cuenta vs Iniciar Sesión con Teléfono */}
-                      <div className="grid grid-cols-2 gap-1.5 p-1 bg-black/30 rounded-xl border border-white/10 text-xs font-bold text-center">
+                  {/* Google Quick Sign Up Option */}
+                  <div className="space-y-2">
+                    <p className="text-xs text-white/70 font-bold uppercase tracking-widest text-left px-1">Registro Rápido</p>
+                    <button
+                      type="button"
+                      onClick={handleLogin}
+                      disabled={isLoggingIn}
+                      className="w-full bg-white hover:bg-emerald-50 text-emerald-800 py-3.5 rounded-2xl font-bold text-sm shadow-md transition-all active:scale-95 flex items-center justify-center gap-3 disabled:opacity-70 cursor-pointer text-center"
+                    >
+                      {isLoggingIn ? (
+                        <div className="w-4 h-4 border-2 border-emerald-800 border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        <img src="https://www.google.com/favicon.ico" className="w-4 h-4" alt="Google" />
+                      )}
+                      {isLoggingIn ? 'Conectando...' : 'Crear cuenta con Google'}
+                    </button>
+                  </div>
+
+                  <div className="relative flex py-1.5 items-center">
+                    <div className="flex-grow border-t border-white/10"></div>
+                    <span className="flex-shrink mx-3 text-[10px] text-white/40 font-bold uppercase tracking-wider">o completa tu registro</span>
+                    <div className="flex-grow border-t border-white/10"></div>
+                  </div>
+
+                  <form onSubmit={handleEmailRegister} className="space-y-3.5">
+                    {/* Role Selector */}
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-white/70 mb-1 px-1">¿Cómo deseas registrarte?</label>
+                      <div className="grid grid-cols-3 gap-1.5 p-1 bg-black/20 rounded-xl border border-white/10 text-[11px] font-bold text-center">
                         <button
                           type="button"
-                          onClick={() => setPhoneAuthSubMode('register')}
-                          className={`py-1.5 rounded-lg transition-all ${phoneAuthSubMode === 'register' ? 'bg-white text-emerald-800 shadow' : 'text-white/70 hover:text-white'}`}
+                          onClick={() => setEmailForm({ ...emailForm, selectedRole: 'usuario' })}
+                          className={`py-2 rounded-lg transition-all ${emailForm.selectedRole === 'usuario' ? 'bg-white text-emerald-800 shadow' : 'text-white/70 hover:text-white'}`}
                         >
-                          Crear Cuenta Nueva
+                          Pasajero
                         </button>
                         <button
                           type="button"
-                          onClick={() => setPhoneAuthSubMode('login')}
-                          className={`py-1.5 rounded-lg transition-all ${phoneAuthSubMode === 'login' ? 'bg-white text-emerald-800 shadow' : 'text-white/70 hover:text-white'}`}
+                          onClick={() => setEmailForm({ ...emailForm, selectedRole: 'conductor' })}
+                          className={`py-2 rounded-lg transition-all ${emailForm.selectedRole === 'conductor' ? 'bg-white text-emerald-800 shadow' : 'text-white/70 hover:text-white'}`}
                         >
-                          Ya tengo cuenta
+                          Conductor
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEmailForm({ ...emailForm, selectedRole: 'marca_aliada' })}
+                          className={`py-2 rounded-lg transition-all ${emailForm.selectedRole === 'marca_aliada' ? 'bg-white text-emerald-800 shadow' : 'text-white/70 hover:text-white'}`}
+                        >
+                          Comercio
                         </button>
                       </div>
+                    </div>
 
-                      <div className="p-3 bg-white/10 rounded-2xl border border-white/15 text-xs text-white/90 leading-relaxed">
-                        {phoneAuthSubMode === 'register' ? (
-                          <span>📱 <strong>Nuevo Registro:</strong> Te enviaremos un código SMS de 6 dígitos. Solo números de Colombia (+57).</span>
-                        ) : (
-                          <span>🔐 <strong>Iniciar Sesión:</strong> Ingresa tu número celular registrado para recibir tu código SMS de acceso.</span>
-                        )}
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold uppercase tracking-wider text-white/80 mb-1.5 px-1">
-                          Número de Celular (Colombia)
-                        </label>
-                        <div className="relative flex items-center">
-                          <span className="absolute left-3.5 text-sm font-bold text-emerald-300 pointer-events-none">
-                            🇨🇴 +57
-                          </span>
+                    {emailForm.selectedRole === 'marca_aliada' ? (
+                      /* Fields for Commercial Brand */
+                      <>
+                        <div>
+                          <label className="block text-[11px] font-bold uppercase tracking-wider text-white/80 mb-1 px-1">Nombre Comercial</label>
+                          <input
+                            type="text"
+                            required
+                            value={emailForm.nombre_comercial}
+                            onChange={(e) => setEmailForm({ ...emailForm, nombre_comercial: e.target.value })}
+                            placeholder="Ej. Restaurante Sabor Criollo"
+                            className="w-full bg-black/20 border border-white/10 focus:border-emerald-400 rounded-xl p-3 text-sm text-white placeholder-white/30 focus:outline-none transition-all"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-bold uppercase tracking-wider text-white/80 mb-1 px-1">Categoría</label>
+                          <select
+                            value={emailForm.categoria_aliado}
+                            onChange={(e) => setEmailForm({ ...emailForm, categoria_aliado: e.target.value })}
+                            className="w-full bg-black/40 border border-white/10 focus:border-emerald-400 rounded-xl p-3 text-sm text-white focus:outline-none transition-all"
+                          >
+                            <option value="Restaurante" className="bg-slate-800 text-white">Restaurante / Comidas</option>
+                            <option value="Mercado" className="bg-slate-800 text-white">Supermercado / Víveres</option>
+                            <option value="Farmacia" className="bg-slate-800 text-white">Farmacia / Droguería</option>
+                            <option value="Moda" className="bg-slate-800 text-white">Moda / Calzado</option>
+                            <option value="Tecnologia" className="bg-slate-800 text-white">Tecnología / Accesorios</option>
+                            <option value="Servicios" className="bg-slate-800 text-white">Servicios Profesionales</option>
+                            <option value="Otro" className="bg-slate-800 text-white">Otro Comercio</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-bold uppercase tracking-wider text-white/80 mb-1 px-1">WhatsApp del Comercio (10 dígitos)</label>
                           <input
                             type="tel"
                             required
-                            value={phoneInput}
-                            onChange={(e) => setPhoneInput(e.target.value)}
+                            value={emailForm.whatsapp_aliado}
+                            onChange={(e) => setEmailForm({ ...emailForm, whatsapp_aliado: e.target.value })}
                             placeholder="312 345 6789"
-                            className="w-full bg-black/20 border border-white/10 focus:border-emerald-400 rounded-2xl py-3.5 pl-20 pr-4 text-sm text-white placeholder-white/30 focus:outline-none font-semibold transition-all tracking-wider"
+                            className="w-full bg-black/20 border border-white/10 focus:border-emerald-400 rounded-xl p-3 text-sm text-white placeholder-white/30 focus:outline-none transition-all"
                           />
                         </div>
-                        <div className="flex items-center justify-between text-[10px] text-white/60 mt-1.5 px-1">
-                          <span>Seguridad: Máx. 3 intentos en 5 min (bloqueo 15 min)</span>
-                          <span className="font-mono text-emerald-300">Máx 2 equipos</span>
-                        </div>
-                      </div>
-
-                      <div className="text-left py-1 text-[11px] text-white/60 leading-relaxed">
-                        Al continuar, aceptas el protocolo de seguridad y validación OTP para Ruedas Rápidas.
-                      </div>
-
-                      <button
-                        type="submit"
-                        disabled={isPhoneProcessing || !phoneInput.trim()}
-                        className="w-full bg-white text-emerald-800 py-4 rounded-2xl font-bold text-base shadow-lg hover:bg-emerald-50 transition-all active:scale-95 flex items-center justify-center gap-3 disabled:opacity-50 mt-4 cursor-pointer"
-                      >
-                        {isPhoneProcessing ? (
-                          <div className="w-5 h-5 border-2 border-emerald-800 border-t-transparent rounded-full animate-spin" />
-                        ) : (
-                          <Smartphone size={18} />
-                        )}
-                        {isPhoneProcessing ? 'Enviando código SMS...' : phoneAuthSubMode === 'register' ? 'Registrarme con SMS' : 'Enviar código de acceso'}
-                      </button>
-                    </form>
-                  ) : (
-                    /* Paso 2: Input de 6 dígitos + Botón "Verificar" */
-                    <form onSubmit={handleVerifyPhoneOTP} className="space-y-4">
-                      <div className="p-3 bg-emerald-500/20 rounded-2xl border border-emerald-400/30 text-xs text-emerald-100 leading-relaxed flex items-center justify-between">
                         <div>
-                          <p className="font-bold text-white text-xs">Código SMS enviado a:</p>
-                          <p className="font-mono text-emerald-200 text-sm">{phoneInput}</p>
+                          <label className="block text-[11px] font-bold uppercase tracking-wider text-white/80 mb-1 px-1">Dirección Física</label>
+                          <input
+                            type="text"
+                            required
+                            value={emailForm.direccion_fisica}
+                            onChange={(e) => setEmailForm({ ...emailForm, direccion_fisica: e.target.value })}
+                            placeholder="Calle 10 # 5-20"
+                            className="w-full bg-black/20 border border-white/10 focus:border-emerald-400 rounded-xl p-3 text-sm text-white placeholder-white/30 focus:outline-none transition-all"
+                          />
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setPhoneStep(1);
-                            setOtpCodeInput('');
-                          }}
-                          className="text-[11px] font-bold text-emerald-300 underline hover:text-white px-2 py-1"
-                        >
-                          Cambiar número
-                        </button>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold uppercase tracking-wider text-white/80 mb-1.5 px-1">
-                          Código de 6 Dígitos
-                        </label>
-                        <input
-                          type="text"
-                          inputMode="numeric"
-                          maxLength={6}
-                          required
-                          value={otpCodeInput}
-                          onChange={(e) => setOtpCodeInput(e.target.value.replace(/\D/g, ''))}
-                          placeholder="123456"
-                          className="w-full bg-black/30 border-2 border-emerald-400/50 focus:border-emerald-300 rounded-2xl py-3.5 text-center text-2xl font-mono text-white tracking-[0.5em] placeholder-white/20 focus:outline-none transition-all shadow-inner"
-                        />
-                        <div className="flex items-center justify-between text-[10px] text-white/70 mt-1.5 px-1">
-                          <span>Ingresa los 6 números del SMS</span>
-                          <button
-                            type="button"
-                            onClick={() => setOtpCodeInput('123456')}
-                            className="text-emerald-300 hover:text-emerald-200 underline font-mono text-[11px] cursor-pointer"
-                          >
-                            Usar código demo (123456)
-                          </button>
+                        <div>
+                          <label className="block text-[11px] font-bold uppercase tracking-wider text-white/80 mb-1 px-1">Ciudad de Cobertura</label>
+                          <input
+                            type="text"
+                            required
+                            value={emailForm.ciudad_cobertura}
+                            onChange={(e) => setEmailForm({ ...emailForm, ciudad_cobertura: e.target.value })}
+                            placeholder="Fusagasugá"
+                            className="w-full bg-black/20 border border-white/10 focus:border-emerald-400 rounded-xl p-3 text-sm text-white placeholder-white/30 focus:outline-none transition-all"
+                          />
                         </div>
-                      </div>
+                      </>
+                    ) : (
+                      /* Standard User/Driver fields */
+                      <>
+                        <div>
+                          <label className="block text-[11px] font-bold uppercase tracking-wider text-white/80 mb-1 px-1">Nombre Completo</label>
+                          <input
+                            type="text"
+                            required
+                            value={emailForm.nombre}
+                            onChange={(e) => setEmailForm({ ...emailForm, nombre: e.target.value })}
+                            placeholder="Tu nombre y apellido"
+                            className="w-full bg-black/20 border border-white/10 focus:border-emerald-400 rounded-xl p-3 text-sm text-white placeholder-white/30 focus:outline-none transition-all"
+                          />
+                        </div>
 
+                        <div>
+                          <label className="block text-[11px] font-bold uppercase tracking-wider text-white/80 mb-1 px-1">Teléfono de Contacto (10 dígitos)</label>
+                          <input
+                            type="tel"
+                            required
+                            value={emailForm.telefono}
+                            onChange={(e) => setEmailForm({ ...emailForm, telefono: e.target.value })}
+                            placeholder="312 345 6789"
+                            className="w-full bg-black/20 border border-white/10 focus:border-emerald-400 rounded-xl p-3 text-sm text-white placeholder-white/30 focus:outline-none transition-all"
+                          />
+                        </div>
+                      </>
+                    )}
+
+                    <div>
+                      <label className="block text-[11px] font-bold uppercase tracking-wider text-white/80 mb-1 px-1">Correo Electrónico</label>
+                      <input
+                        type="email"
+                        required
+                        value={emailForm.email}
+                        onChange={(e) => setEmailForm({ ...emailForm, email: e.target.value })}
+                        placeholder="tunombre@ejemplo.com"
+                        className="w-full bg-black/20 border border-white/10 focus:border-emerald-400 rounded-xl p-3 text-sm text-white placeholder-white/30 focus:outline-none transition-all"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold uppercase tracking-wider text-white/80 mb-1 px-1">Contraseña (Mínimo 6 caracteres)</label>
+                      <input
+                        type="password"
+                        required
+                        minLength={6}
+                        value={emailForm.password}
+                        onChange={(e) => setEmailForm({ ...emailForm, password: e.target.value })}
+                        placeholder="Crea una contraseña segura"
+                        className="w-full bg-black/20 border border-white/10 focus:border-emerald-400 rounded-xl p-3 text-sm text-white placeholder-white/30 focus:outline-none transition-all"
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={isEmailProcessing}
+                      className="w-full bg-emerald-500 hover:bg-emerald-600 text-white py-4 rounded-2xl font-bold text-base shadow-lg transition-all active:scale-95 flex items-center justify-center gap-3 disabled:opacity-70 mt-4 cursor-pointer"
+                    >
+                      {isEmailProcessing && (
+                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      )}
+                      Crear Cuenta con Correo
+                    </button>
+
+                    <div className="text-center pt-2">
                       <button
-                        type="submit"
-                        disabled={isPhoneProcessing || otpCodeInput.trim().length < 6}
-                        className="w-full bg-emerald-500 hover:bg-emerald-600 text-white py-4 rounded-2xl font-bold text-base shadow-lg transition-all active:scale-95 flex items-center justify-center gap-3 disabled:opacity-50 mt-4 cursor-pointer"
+                        type="button"
+                        onClick={() => setEmailAuthMode('login')}
+                        className="text-xs text-white/70 hover:text-white underline font-semibold transition-colors"
                       >
-                        {isPhoneProcessing ? (
-                          <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                        ) : (
-                          <CheckCircle2 size={18} />
-                        )}
-                        {isPhoneProcessing ? 'Validando código...' : 'Verificar'}
+                        ¿Ya tienes cuenta? Inicia sesión aquí
                       </button>
-
-                      <div className="text-center pt-2">
-                        <button
-                          type="button"
-                          disabled={isPhoneProcessing}
-                          onClick={handleRequestPhoneOTP}
-                          className="text-xs text-white/70 hover:text-white underline font-semibold transition-colors disabled:opacity-50"
-                        >
-                          ¿No recibiste el SMS? Reenviar código
-                        </button>
-                      </div>
-                    </form>
-                  )}
+                    </div>
+                  </form>
                 </div>
               )}
 
@@ -4874,59 +4932,6 @@ export default function App() {
                     >
                       Cerrar aviso
                     </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Panel de Acceso Directo de Prueba (1-Clic) */}
-              <div className="pt-2 border-t border-white/10 space-y-2 text-left">
-                <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-white/70 px-1">
-                  <span>Acceso Rápido de Prueba</span>
-                  <span className="text-[10px] text-emerald-300 font-mono">1-Clic</span>
-                </div>
-                <div className="grid grid-cols-3 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleQuickDemoLogin('usuario')}
-                    disabled={isLoggingIn}
-                    className="p-2.5 bg-white/10 hover:bg-white/20 border border-white/15 rounded-xl text-center transition-all active:scale-95 cursor-pointer disabled:opacity-50"
-                  >
-                    <span className="text-base block mb-0.5">👤</span>
-                    <span className="text-[11px] font-bold text-white block leading-tight">Pasajero</span>
-                    <span className="text-[9px] text-emerald-200 block">Pedir viaje</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleQuickDemoLogin('conductor')}
-                    disabled={isLoggingIn}
-                    className="p-2.5 bg-white/10 hover:bg-white/20 border border-white/15 rounded-xl text-center transition-all active:scale-95 cursor-pointer disabled:opacity-50"
-                  >
-                    <span className="text-base block mb-0.5">🚗</span>
-                    <span className="text-[11px] font-bold text-white block leading-tight">Conductor</span>
-                    <span className="text-[9px] text-emerald-200 block">Aceptar viaje</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleQuickDemoLogin('admin')}
-                    disabled={isLoggingIn}
-                    className="p-2.5 bg-white/10 hover:bg-white/20 border border-white/15 rounded-xl text-center transition-all active:scale-95 cursor-pointer disabled:opacity-50"
-                  >
-                    <span className="text-base block mb-0.5">🛡️</span>
-                    <span className="text-[11px] font-bold text-white block leading-tight">Admin</span>
-                    <span className="text-[9px] text-emerald-200 block">Gestión total</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Helpful Alert/Hint regarding dynamic preview iframes */}
-              {typeof window !== 'undefined' && window.self !== window.top && (
-                <div className="p-3.5 bg-emerald-500/10 border border-emerald-400/20 rounded-2xl text-left flex gap-2.5 text-emerald-100 text-xs leading-relaxed">
-                  <Info size={18} className="text-emerald-300 shrink-0 mt-0.5" />
-                  <div>
-                    <span className="font-bold text-white block mb-0.5">Modo Vista Previa</span>
-                    Usa los botones de <strong>Acceso Rápido</strong> arriba para alternar instantáneamente entre Pasajero, Conductor y Administrador.
                   </div>
                 </div>
               )}
@@ -6601,48 +6606,42 @@ export default function App() {
                                   />
                                 )}
 
-                                {/* Mapa activo solo mientras va en camino al punto de recogida. Cuando se inicia el viaje (en_transito), el mapa desaparece. */}
-                                 {(viaje.estado === 'aceptado' || viaje.estado === 'en_camino' || viaje.estado === 'llegando') ? (
-                                   <div className="w-full space-y-4">
-                                     {(() => {
-                                       const { origen } = getTripRoutePoints(viaje, driverGpsLocation);
-                                       return (
-                                         <DriverLiveMap 
-                                           driverId={user.uid} 
-                                           driverName={conductor.nombre} 
-                                           isOnline={conductor.activo} 
-                                           origen={origen}
-                                           destino={null}
-                                           showRoute={true}
-                                         />
-                                       );
-                                     })()}
-                                     <div className="w-full h-auto rounded-[2rem] overflow-hidden border border-emerald-100 shadow-sm">
-                                       <TripStatusAnimation 
-                                         status={viaje.estado} 
-                                         role="conductor" 
-                                       />
-                                     </div>
-                                   </div>
-                                 ) : viaje.estado === 'en_transito' ? (
-                                   <div className="w-full space-y-3">
-                                     <div className="bg-emerald-50 border border-emerald-200 p-4 rounded-2xl flex items-center gap-3 text-emerald-800 shadow-xs">
-                                       <div className="w-10 h-10 rounded-xl bg-emerald-500 text-white flex items-center justify-center font-black shrink-0 text-lg shadow-sm">
-                                         🚖
-                                       </div>
-                                       <div>
-                                         <p className="text-xs font-black uppercase tracking-wider text-emerald-950">¡Servicio en Transcurso!</p>
-                                         <p className="text-[11px] text-emerald-700 font-medium leading-tight mt-0.5">Te encuentras en trayecto con el pasajero hacia el destino. Dirígete con precaución.</p>
-                                       </div>
-                                     </div>
-                                     <div className="w-full h-auto rounded-[2rem] overflow-hidden border border-emerald-100 shadow-sm">
-                                       <TripStatusAnimation 
-                                         status={viaje.estado} 
-                                         role="conductor" 
-                                       />
-                                     </div>
-                                   </div>
-                                 ) : null}
+                                {/* Mapa activo durante todo el servicio (aceptado, en_camino, llegando, en_transito) hasta finalizar */}
+                                {(viaje.estado === 'aceptado' || viaje.estado === 'en_camino' || viaje.estado === 'llegando' || viaje.estado === 'en_transito') && (
+                                  <div className="w-full space-y-4">
+                                    {viaje.estado === 'en_transito' && (
+                                      <div className="bg-emerald-50 border border-emerald-200 p-3.5 rounded-2xl flex items-center gap-3 text-emerald-800 shadow-xs">
+                                        <div className="w-9 h-9 rounded-xl bg-emerald-500 text-white flex items-center justify-center font-black shrink-0 text-base shadow-sm">
+                                          🚖
+                                        </div>
+                                        <div>
+                                          <p className="text-xs font-black uppercase tracking-wider text-emerald-950">¡Servicio en Transcurso!</p>
+                                          <p className="text-[11px] text-emerald-700 font-medium leading-tight mt-0.5">Te encuentras en trayecto con el pasajero hacia el destino. Mapa y GPS activos.</p>
+                                        </div>
+                                      </div>
+                                    )}
+                                    {(() => {
+                                      const { origen, destino } = getTripRoutePoints(viaje, driverGpsLocation);
+                                      return (
+                                        <DriverLiveMap 
+                                          driverId={user.uid} 
+                                          driverName={conductor.nombre} 
+                                          isOnline={conductor.activo} 
+                                          origen={origen}
+                                          destino={destino}
+                                          showRoute={true}
+                                          status={viaje.estado}
+                                        />
+                                      );
+                                    })()}
+                                    <div className="w-full h-auto rounded-[2rem] overflow-hidden border border-emerald-100 shadow-sm">
+                                      <TripStatusAnimation 
+                                        status={viaje.estado} 
+                                        role="conductor" 
+                                      />
+                                    </div>
+                                  </div>
+                                )}
                                 
                                 <div className="flex flex-col gap-2.5 w-full">
                                   {(viaje.estado === 'aceptado' || viaje.estado === 'en_camino' || viaje.estado === 'llegando' || viaje.estado === 'en_transito') && (

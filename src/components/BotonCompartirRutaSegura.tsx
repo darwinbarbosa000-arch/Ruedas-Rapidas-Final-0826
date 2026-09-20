@@ -65,20 +65,20 @@ export const BotonCompartirRutaSegura: React.FC<BotonCompartirRutaSeguraProps> =
     <>
       {/* 1. Variante Banner Discreto (para estado 'en_transito') */}
       {variant === 'banner' ? (
-        <div className="w-full bg-emerald-50/90 border border-emerald-200/80 rounded-xl px-3 py-2 flex items-center justify-between gap-2 shadow-2xs">
+        <div className="w-full bg-emerald-50/95 border border-emerald-200/90 rounded-xl px-2.5 py-1.5 flex items-center justify-between gap-2 shadow-2xs">
           <div className="flex items-center gap-2 min-w-0">
-            <div className="w-6 h-6 rounded-lg bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
-              <ShieldCheck size={14} />
+            <div className="w-5 h-5 rounded-md bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
+              <ShieldCheck size={12} />
             </div>
             <div className="min-w-0 text-left">
               <div className="flex items-center gap-1.5">
-                <span className="text-[9px] font-black uppercase text-emerald-800 tracking-wider">
-                  Ruta Segura
+                <span className="text-[9px] font-black uppercase text-emerald-900 tracking-wider">
+                  Ruta Segura WhatsApp
                 </span>
                 <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
               </div>
-              <p className="text-[11px] font-medium text-slate-600 truncate">
-                Comparte tu trayecto en vivo
+              <p className="text-[10px] font-medium text-slate-500 truncate leading-none mt-0.5">
+                Enlace en vivo con placa y ubicación
               </p>
             </div>
           </div>
@@ -87,10 +87,10 @@ export const BotonCompartirRutaSegura: React.FC<BotonCompartirRutaSeguraProps> =
             type="button"
             onClick={handleShare}
             disabled={sharing}
-            className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-black rounded-lg uppercase tracking-wide flex items-center gap-1.5 shrink-0 shadow-2xs transition-all active:scale-95 cursor-pointer disabled:opacity-50"
+            className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[9px] font-black rounded-lg uppercase tracking-wider flex items-center gap-1 shrink-0 shadow-2xs transition-all active:scale-95 cursor-pointer disabled:opacity-50"
           >
-            <Share2 size={11} />
-            <span>{sharing ? '...' : 'Compartir'}</span>
+            <Share2 size={10} />
+            <span>{sharing ? '...' : 'Enviar'}</span>
           </button>
         </div>
       ) : variant === 'inline-action' ? (
@@ -100,29 +100,29 @@ export const BotonCompartirRutaSegura: React.FC<BotonCompartirRutaSeguraProps> =
           onClick={handleShare}
           disabled={sharing}
           title="Compartir mi ruta segura por WhatsApp"
-          className={`w-full py-1.5 px-2 bg-emerald-50 hover:bg-emerald-100/90 text-emerald-800 border border-emerald-200/90 rounded-xl text-[10px] font-bold flex items-center justify-center gap-1.5 transition-all shadow-2xs active:scale-[0.98] cursor-pointer ${className}`}
+          className={`w-full py-1.5 px-2 bg-emerald-50/90 hover:bg-emerald-100 text-emerald-800 border border-emerald-200/90 rounded-xl text-[10px] font-bold flex items-center justify-center gap-1.5 transition-all shadow-2xs active:scale-[0.98] cursor-pointer ${className}`}
         >
-          <ShieldCheck size={13} className="text-emerald-600 shrink-0" />
+          <ShieldCheck size={12} className="text-emerald-600 shrink-0" />
           <span className="truncate">Compartir ruta segura por WhatsApp</span>
         </button>
       ) : (
-        /* 3. Botón por defecto: Minimalista, esbelto y sin salirse de la interfaz */
+        /* 3. Botón por defecto: Ultra-compacto, minimalista, refinado y 100% contenido en la pantalla */
         <button
           type="button"
           onClick={handleShare}
           disabled={sharing}
           title="Compartir mi ruta segura por WhatsApp"
-          className={`w-full py-2 px-2.5 bg-emerald-50/90 hover:bg-emerald-100 text-emerald-800 border border-emerald-200/90 rounded-xl text-[10px] font-bold flex items-center justify-between gap-1.5 transition-all active:scale-[0.99] cursor-pointer disabled:opacity-50 shadow-2xs ${className}`}
+          className={`w-full py-1.5 px-2 bg-emerald-50/90 hover:bg-emerald-100/90 text-emerald-900 border border-emerald-200/80 rounded-xl text-[10px] font-semibold flex items-center justify-between gap-1.5 transition-all active:scale-[0.99] cursor-pointer disabled:opacity-50 shadow-2xs ${className}`}
         >
           <div className="flex items-center gap-1.5 min-w-0">
-            <div className="w-5 h-5 rounded-md bg-emerald-600 text-white flex items-center justify-center shrink-0">
-              <ShieldCheck size={12} />
+            <div className="w-4 h-4 rounded bg-emerald-600 text-white flex items-center justify-center shrink-0">
+              <ShieldCheck size={11} />
             </div>
-            <span className="truncate">Compartir ruta segura</span>
+            <span className="text-[10px] font-bold text-slate-800 truncate">Ruta Segura</span>
           </div>
-          <div className="flex items-center gap-1 text-[9px] font-extrabold text-emerald-700 bg-white/90 px-1.5 py-0.5 rounded-md border border-emerald-200/70 shrink-0">
-            <span>WHATSAPP</span>
-            <Share2 size={10} />
+          <div className="flex items-center gap-1 text-[9px] font-bold text-emerald-700 bg-white/95 px-1.5 py-0.5 rounded border border-emerald-200 shrink-0">
+            <span className="tracking-wide">WhatsApp</span>
+            <Share2 size={9} />
           </div>
         </button>
       )}
