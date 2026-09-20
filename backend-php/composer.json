@@ -1,0 +1,9 @@
+{
+    "name": "ruedas-rapidas/registro-blindado",
+    "description": "Backend de Registro Blindado con PHPMailer, reCAPTCHA v3 y BCRYPT para Ruedas Rápidas",
+    "type": "project",
+    "require": {
+        "php": ">=7.4",
+        "phpmailer/phpmailer": "^6.9"
+    }
+}
