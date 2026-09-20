@@ -12,6 +12,8 @@ CREATE TABLE IF NOT EXISTS `usuarios` (
   `password_hash` VARCHAR(255) NOT NULL,
   `token_verificacion` VARCHAR(64) DEFAULT NULL,
   `estado` ENUM('pendiente', 'activo', 'bloqueado') NOT NULL DEFAULT 'pendiente',
+  `intentos_fallidos` INT UNSIGNED NOT NULL DEFAULT 0,
+  `bloqueado_hasta` DATETIME DEFAULT NULL,
   `ip_registro` VARCHAR(45) NOT NULL,
   `email_verificado_en` DATETIME DEFAULT NULL,
   `creado` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -20,10 +22,23 @@ CREATE TABLE IF NOT EXISTS `usuarios` (
   UNIQUE KEY `idx_usuarios_email` (`email`),
   KEY `idx_usuarios_token` (`token_verificacion`),
   KEY `idx_usuarios_ip_creado` (`ip_registro`, `creado`),
-  KEY `idx_usuarios_estado` (`estado`)
+  KEY `idx_usuarios_estado` (`estado`),
+  KEY `idx_usuarios_bloqueado` (`bloqueado_hasta`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Tabla complementaria para registro de intentos de login y seguridad (opcional)
+-- Tabla para auditoría y conteo de intentos fallidos (Anti-fuerza bruta)
+CREATE TABLE IF NOT EXISTS `intentos_registro` (
+  `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `email` VARCHAR(191) NOT NULL,
+  `ip` VARCHAR(45) NOT NULL,
+  `motivo` VARCHAR(100) NOT NULL DEFAULT 'fallido',
+  `fecha` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_intentos_reg_email_fecha` (`email`, `fecha`),
+  KEY `idx_intentos_reg_ip_fecha` (`ip`, `fecha`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Tabla complementaria para registro de intentos de login y seguridad
 CREATE TABLE IF NOT EXISTS `intentos_login` (
   `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
   `email` VARCHAR(191) NOT NULL,

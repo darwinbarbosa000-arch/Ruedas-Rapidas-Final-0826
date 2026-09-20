@@ -113,15 +113,63 @@ if (!empty(RECAPTCHA_SECRET_KEY) && RECAPTCHA_SECRET_KEY !== 'TU_CLAVE_SECRETA_R
 // 2. VALIDACIÓN DURA Y SANITIZACIÓN DE ENTRADAS
 // =========================================================================
 
+$pdo = obtenerConexionDB();
+$ip = obtenerIPCliente();
+
 $email = filter_var(trim($input['email'] ?? ''), FILTER_VALIDATE_EMAIL);
 if (!$email) {
+    registrarFallo($pdo, 'email_invalido@desconocido', $ip, 'Email con formato inválido');
     http_response_code(400);
     echo json_encode(['status' => 'error', 'message' => 'El correo electrónico no es válido.']);
     exit;
 }
 
+// 2.1 VERIFICAR BLOQUEO ACTIVO POR FUERZA BRUTA
+$stmtCheck = $pdo->prepare("
+    SELECT id, nombre, estado, intentos_fallidos, bloqueado_hasta, 
+           (bloqueado_hasta IS NOT NULL AND bloqueado_hasta > NOW()) AS esta_bloqueado,
+           TIMESTAMPDIFF(MINUTE, NOW(), bloqueado_hasta) AS minutos_restantes
+    FROM usuarios 
+    WHERE email = ? 
+    LIMIT 1
+");
+$stmtCheck->execute([$email]);
+$usuarioExistente = $stmtCheck->fetch();
+
+if ($usuarioExistente && !empty($usuarioExistente['esta_bloqueado'])) {
+    http_response_code(423);
+    die("Cuenta bloqueada 30 min por seguridad");
+}
+
+// 2.2 CALCULAR INTENTOS FALLIDOS (Anti-fuerza bruta)
+$stmtFallidos = $pdo->prepare("
+    SELECT COUNT(*) FROM intentos_registro 
+    WHERE (email = ? OR ip = ?) AND fecha > NOW() - INTERVAL 30 MINUTE
+");
+$stmtFallidos->execute([$email, $ip]);
+$intentos_fallidos = (int)$stmtFallidos->fetchColumn();
+
+if ($usuarioExistente && isset($usuarioExistente['intentos_fallidos'])) {
+    $intentos_fallidos = max($intentos_fallidos, (int)$usuarioExistente['intentos_fallidos']);
+}
+
+// Bloqueo por fuerza bruta
+if ($intentos_fallidos >= 5) {
+    $pdo->prepare("UPDATE usuarios SET bloqueado_hasta = DATE_ADD(NOW(), INTERVAL 30 MINUTE) WHERE email = ?")->execute([$email]);
+    http_response_code(423);
+    die("Cuenta bloqueada 30 min por seguridad");
+}
+
 $password = $input['password'] ?? '';
 if (strlen($password) < 8) {
+    registrarFallo($pdo, $email, $ip, 'Password menor a 8 caracteres');
+    // Re-evaluar si con este fallo alcanzó los 5 intentos
+    $intentos_fallidos++;
+    if ($intentos_fallidos >= 5) {
+        $pdo->prepare("UPDATE usuarios SET bloqueado_hasta = DATE_ADD(NOW(), INTERVAL 30 MINUTE) WHERE email = ?")->execute([$email]);
+        http_response_code(423);
+        die("Cuenta bloqueada 30 min por seguridad");
+    }
     http_response_code(400);
     echo json_encode(['status' => 'error', 'message' => 'La contraseña debe tener mínimo 8 caracteres.']);
     exit;
@@ -135,15 +183,13 @@ $rol = in_array($input['rol'] ?? '', ['conductor', 'usuario', 'marca_aliada'], t
 // 3. EVITA CUENTAS MASIVAS DEL MISMO IP (ANTI-SABOTAJE / RATE LIMITING)
 // =========================================================================
 
-$pdo = obtenerConexionDB();
-$ip = obtenerIPCliente();
-
 // Consulta preparada: Máximo 3 intentos de registro por IP en la última hora
 $stmtIp = $pdo->prepare("SELECT COUNT(*) AS total FROM usuarios WHERE ip_registro = ? AND creado > NOW() - INTERVAL 1 HOUR");
 $stmtIp->execute([$ip]);
 $intentos = (int)$stmtIp->fetchColumn();
 
 if ($intentos >= 3) {
+    registrarFallo($pdo, $email, $ip, 'Exceso de registros por IP');
     http_response_code(429);
     echo json_encode([
         'status' => 'error',
@@ -152,13 +198,15 @@ if ($intentos >= 3) {
     exit;
 }
 
-// 3.1 Verificar si el correo ya está registrado
-$stmtCheck = $pdo->prepare("SELECT id, estado FROM usuarios WHERE email = ? LIMIT 1");
-$stmtCheck->execute([$email]);
-$usuarioExistente = $stmtCheck->fetch();
-
 if ($usuarioExistente) {
     if ($usuarioExistente['estado'] === 'activo') {
+        registrarFallo($pdo, $email, $ip, 'Intento de registro sobre cuenta activa');
+        $intentos_fallidos++;
+        if ($intentos_fallidos >= 5) {
+            $pdo->prepare("UPDATE usuarios SET bloqueado_hasta = DATE_ADD(NOW(), INTERVAL 30 MINUTE) WHERE email = ?")->execute([$email]);
+            http_response_code(423);
+            die("Cuenta bloqueada 30 min por seguridad");
+        }
         http_response_code(409);
         echo json_encode([
             'status' => 'error',
@@ -170,7 +218,16 @@ if ($usuarioExistente) {
         $token_verificacion = bin2hex(random_bytes(32)); // 64 caracteres
         $nuevoHash = password_hash($password, PASSWORD_BCRYPT, ['cost' => 12]);
 
-        $stmtReenvio = $pdo->prepare("UPDATE usuarios SET password_hash = ?, token_verificacion = ?, ip_registro = ?, creado = NOW() WHERE id = ?");
+        $stmtReenvio = $pdo->prepare("
+            UPDATE usuarios 
+            SET password_hash = ?, 
+                token_verificacion = ?, 
+                ip_registro = ?, 
+                intentos_fallidos = 0,
+                bloqueado_hasta = NULL,
+                creado = NOW() 
+            WHERE id = ?
+        ");
         $stmtReenvio->execute([$nuevoHash, $token_verificacion, $ip, $usuarioExistente['id']]);
 
         // Proceder al envío del correo
@@ -333,4 +390,20 @@ function construirPlantillaHTML($nombre, $link) {
     </body>
     </html>
     ';
+}
+
+/**
+ * Registra un intento fallido para auditoría y conteo de fuerza bruta
+ */
+function registrarFallo($pdo, $email, $ip, $motivo) {
+    try {
+        $stmt = $pdo->prepare("INSERT INTO intentos_registro (email, ip, motivo, fecha) VALUES (?, ?, ?, NOW())");
+        $stmt->execute([$email, $ip, $motivo]);
+
+        // Si el usuario existe, incrementar su contador individual de intentos fallidos
+        $stmtUp = $pdo->prepare("UPDATE usuarios SET intentos_fallidos = intentos_fallidos + 1 WHERE email = ?");
+        $stmtUp->execute([$email]);
+    } catch (\Exception $e) {
+        error_log("Error al registrar fallo de fuerza bruta: " . $e->getMessage());
+    }
 }

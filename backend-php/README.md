@@ -11,19 +11,28 @@ Este módulo implementa el protocolo estricto de seguridad anti-bots, anti-sabot
    - Campo invisible `website`. Si un bot rellena este campo, el script finaliza sin procesar datos.
 2. **Google reCAPTCHA v3:**
    - Verificación del token con los servidores de Google mediante cURL y validación de score humano (>= 0.5).
-3. **Validación Dura:**
+3. **Bloqueo Automático por Fuerza Bruta (30 minutos):**
+   - Si se detectan $\ge 5$ intentos fallidos, el sistema ejecuta de forma inmediata:
+     ```php
+     if ($intentos_fallidos >= 5) {
+       $conn->query("UPDATE usuarios SET bloqueado_hasta = DATE_ADD(NOW(), INTERVAL 30 MINUTE) WHERE email='$email'");
+       die("Cuenta bloqueada 30 min por seguridad");
+     }
+     ```
+   - Si la cuenta está en período de castigo temporal (`bloqueado_hasta > NOW()`), se rechaza cualquier acción inmediatamente con código HTTP 423 (Locked).
+4. **Validación Dura:**
    - Validación estricta con `FILTER_VALIDATE_EMAIL`.
    - Longitud mínima de contraseña de 8 caracteres.
-4. **Anti-Sabotaje / Rate Limiting por IP:**
+5. **Anti-Sabotaje / Rate Limiting por IP:**
    - Previene la creación masiva de cuentas: máximo **3 registros por hora por cada dirección IP**.
    - Detección precisa de IP real compatible con Cloudflare / proxies.
-5. **Cero Contraseñas en Texto Plano:**
+6. **Cero Contraseñas en Texto Plano:**
    - Hashing con `password_hash($password, PASSWORD_BCRYPT, ['cost' => 12])`. Nunca MD5 ni SHA1.
-6. **Token Criptográfico de 64 Caracteres:**
+7. **Token Criptográfico de 64 Caracteres:**
    - Generado con `bin2hex(random_bytes(32))` para evitar adivinanzas o ataques de fuerza bruta.
-7. **Consultas Preparadas (Prepared Statements PDO):**
+8. **Consultas Preparadas (Prepared Statements PDO):**
    - Inmunidad total contra inyección SQL.
-8. **Envío con PHPMailer (SMTP Hostinger):**
+9. **Envío con PHPMailer (SMTP Hostinger):**
    - Despacho seguro por puerto 465 (SSL) con plantilla HTML responsive y enlace único a `verificar.php`.
 
 ---
@@ -31,9 +40,10 @@ Este módulo implementa el protocolo estricto de seguridad anti-bots, anti-sabot
 ## 📁 Archivos Incluidos
 
 - `config.php`: Credenciales de MySQL, claves de reCAPTCHA, SMTP de Hostinger y funciones de utilidad.
-- `registro.php`: Endpoint que recibe el registro, aplica los 5 pasos de blindaje y envía el correo.
+- `registro.php`: Endpoint que recibe el registro, aplica el blindaje, verifica intentos fallidos y bloquea a los 5 fallos.
+- `login.php`: Endpoint de autenticación con bloqueo automático por fuerza bruta al 5to intento.
 - `verificar.php`: Valida el token del enlace, activa al usuario en la BD y muestra la pantalla de confirmación.
-- `database.sql`: Script SQL para importar en phpMyAdmin.
+- `database.sql`: Script SQL con campos `bloqueado_hasta` e `intentos_fallidos` para importar en phpMyAdmin.
 - `composer.json`: Para instalar PHPMailer con `composer install`.
 
 ---
