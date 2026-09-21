@@ -67,35 +67,39 @@ const normalizeStr = (str: string) =>
 function validateDriverData(body: any) {
   const phone = body.phone || body.telefono || body.celular || '';
   const city = body.city || body.ciudad || '';
-  const vehicleType = body.vehicle_type || body.vehiculo_tipo || (body.vehiculo && body.vehiculo.tipo) || '';
+  const vehicleType = body.vehicle_type || body.vehiculo_tipo || (body.vehiculo && body.vehiculo.tipo) || 'carro';
 
-  // 1. Validar Teléfono: Debe empezar con +57 y tener 12 dígitos en total (+573001234567)
+  // 1. Validar Teléfono: acepta números de 10 dígitos o formato internacional con prefijo +57 (13 caracteres)
   const cleanPhone = String(phone).trim();
-  const phoneRegex = /^\+57\d{9}$/;
-  if (!cleanPhone || !phoneRegex.test(cleanPhone) || cleanPhone.length !== 12) {
+  const digitsOnly = cleanPhone.replace(/\D/g, '');
+  const isValidPhone = (digitsOnly.length === 10 && digitsOnly.startsWith('3')) || 
+                       (digitsOnly.length === 12 && digitsOnly.startsWith('573')) ||
+                       (/^\+57\d{10}$/.test(cleanPhone)) ||
+                       (/^\d{10}$/.test(cleanPhone));
+
+  if (!cleanPhone || !isValidPhone) {
     return {
       isValid: false,
-      error: 'El teléfono debe iniciar con +57 y tener exactamente 12 caracteres (ej: +573001234567).'
+      error: 'El teléfono debe ser un número celular válido de Colombia (ej: 3228770987 o +573228770987).'
     };
   }
 
-  // 2. Validar Ciudad: Debe estar en ["Yopal", "Bogota", "Medellin"]
-  const normalizedCity = normalizeStr(city);
-  const allowedCities = ['yopal', 'bogota', 'medellin'];
-  if (!normalizedCity || !allowedCities.includes(normalizedCity)) {
+  // 2. Validar Ciudad: Permite cualquier municipio/ciudad válida en Colombia
+  const cleanCity = String(city).trim();
+  if (!cleanCity || cleanCity.length < 2) {
     return {
       isValid: false,
-      error: 'La ciudad de registro debe ser únicamente una de las siguientes: Yopal, Bogota o Medellin.'
+      error: 'Debe ingresar una ciudad o municipio válido de residencia en Colombia.'
     };
   }
 
-  // 3. Validar Tipo de Vehículo: Debe estar en ["moto", "carro", "taxi"]
+  // 3. Validar Tipo de Vehículo: Permite tipos pecuarios, urbanos y de carga autorizados
   const normalizedVehicle = normalizeStr(vehicleType);
-  const allowedVehicles = ['moto', 'carro', 'taxi'];
-  if (!normalizedVehicle || !allowedVehicles.includes(normalizedVehicle)) {
+  const allowedVehicles = ['moto', 'carro', 'taxi', 'motocarro', 'camion_flete', 'camion_acarreo', 'domicilio'];
+  if (normalizedVehicle && !allowedVehicles.includes(normalizedVehicle)) {
     return {
       isValid: false,
-      error: 'El tipo de vehículo debe ser únicamente uno de los siguientes: moto, carro o taxi.'
+      error: 'El tipo de vehículo debe ser uno de los autorizados: carro, moto, taxi o carga.'
     };
   }
 

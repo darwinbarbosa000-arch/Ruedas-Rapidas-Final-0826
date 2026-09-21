@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, User, signOut, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
+import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, User, signOut, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, signInAnonymously } from 'firebase/auth';
 import { collection, onSnapshot, query, where, doc, getDoc, addDoc, setDoc, updateDoc, orderBy, limit, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from './firebase';
 import { 
@@ -20,7 +20,7 @@ import {
   AreaChart, Area, PieChart, Pie, LineChart, Line
 } from 'recharts';
 import { handleFirestoreError, OperationType, crearPerfilUsuario, finalizarViaje, aceptarViaje, ofertarViaje, crearPerfilConductor, solicitarRecarga, aprobarRecarga, rechazarRecarga, toggleEstadoConductor, toggleModoRepartidor, seleccionarOferta, actualizarEstadoViaje, calificarConductor, toggleBloqueoUsuario, toggleBloqueoConductor, toggleAdminSuplente, enviarMensajeAdmin, marcarMensajesChatLeidos, cancelarViajeConductor, recargaManual, ajustarSaldoUsuario, cancelarViajeUsuario, crearViajeExpreso, reservarCupoExpreso, cancelarViajeExpreso, cancelarReservaExpreso, cancelarViajePorAdministrador } from './services/viajeService';
-import { Car, Bike, Package, User as UserIcon, LogOut, ShieldCheck, CreditCard, MapPin, Heart, Shield, Truck, PlusCircle, Check, X, Star, ChevronRight, ChevronDown, ChevronUp, Clock, Lock, Unlock, ShieldAlert, AlertCircle, Info, Zap, MessageCircle, Headphones, Navigation, AlertTriangle, Search, FileText, CheckCircle2, Trophy, Medal, Users, Calendar, XCircle, Power, Store, Edit, Utensils, ShoppingBag, Smartphone, Wrench, Pill, TrendingUp, TrendingDown, Target, Coins, FileSpreadsheet, Upload, Image, ArrowLeftRight, Tag, UserCheck, ArrowRight, Trash2, Eye, Filter, CheckCheck, RefreshCw, SlidersHorizontal, Ban } from 'lucide-react';
+import { Car, Bike, Package, User as UserIcon, LogOut, ShieldCheck, CreditCard, MapPin, Heart, Shield, Truck, PlusCircle, Check, X, Star, ChevronRight, ChevronDown, ChevronUp, Clock, Lock, Unlock, ShieldAlert, AlertCircle, Info, Zap, MessageCircle, Headphones, Navigation, AlertTriangle, Search, FileText, CheckCircle2, Trophy, Medal, Users, Calendar, XCircle, Power, Store, Edit, Utensils, ShoppingBag, Smartphone, Wrench, Pill, TrendingUp, TrendingDown, Target, Coins, FileSpreadsheet, Upload, Image, ArrowLeftRight, Tag, UserCheck, ArrowRight, Trash2, Eye, Filter, CheckCheck, RefreshCw, SlidersHorizontal, Ban, Loader2, Sparkles, Gift } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { Toaster, toast } from 'sonner';
@@ -2027,13 +2027,14 @@ export default function App() {
     telefono: '',
     genero: 'masculino',
     departamento: 'Cundinamarca',
-    ciudad: 'Bogotá',
+    ciudad: 'Fusagasugá',
     rol: 'usuario',
     nombre_comercial: '',
     categoria_aliado: 'Restaurante',
     whatsapp_aliado: '',
     direccion_fisica: ''
   });
+  const [isSubmittingReg, setIsSubmittingReg] = useState(false);
   const [driverRegData, setDriverRegData] = useState({
     genero: 'masculino',
     departamento: 'Cundinamarca',
@@ -3031,7 +3032,7 @@ export default function App() {
             telefono: '+573000000000',
             email: emailForm.email,
             saldo: 20000,
-            saldo_promo: 5000,
+            saldo_promo: 10000,
             rol: 'usuario',
             genero: 'femenino',
             ciudad: 'Fusagasugá',
@@ -3136,7 +3137,7 @@ export default function App() {
           celular: validPhone,
           telefono: validPhone,
           saldo: 0,
-          saldo_promo: 0,
+          saldo_promo: 10000,
           rol: 'usuario',
           genero: 'femenino',
           terminos_aceptados: true,
@@ -3250,6 +3251,7 @@ export default function App() {
         toast.success("¡Registro completado! Tu comercio quedó en modo de espera para validación y aprobación administrativa anti-spam.");
       } else {
         // Crear perfil de usuario inmediatamente con status: pending
+        const initialPromo = emailForm.selectedRole === 'conductor' ? 50000 : 10000;
         await crearPerfilUsuario(newUser.uid, {
           nombre: emailForm.nombre,
           email: emailForm.email,
@@ -3258,7 +3260,7 @@ export default function App() {
           ciudad: emailForm.ciudad || 'Fusagasugá',
           departamento: emailForm.departamento || 'Cundinamarca',
           saldo: 0,
-          saldo_promo: 0,
+          saldo_promo: initialPromo,
           rol: emailForm.selectedRole,
           genero: emailForm.genero || 'femenino',
           terminos_aceptados: true,
@@ -3278,7 +3280,11 @@ export default function App() {
             vehiculo: { tipo: 'carro', placa: 'AAA-000', modelo: 'Modelo de prueba' }
           });
         }
-        toast.success("¡Usuario registrado con éxito!");
+        toast.success(
+          emailForm.selectedRole === 'conductor'
+            ? "🎉 ¡Registro exitoso! Recibiste tu Bono de $50.000 COP en Tarjeta Virtual."
+            : "🎉 ¡Registro exitoso! Recibiste tu Bono de $10.000 COP para tus viajes."
+        );
       }
 
       setShowEmailLogin(false);
@@ -3308,86 +3314,210 @@ export default function App() {
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
+    if (isSubmittingReg) return;
+
     if (!termsAccepted) {
-      alert("Debe aceptar los términos y condiciones para registrarse.");
+      toast.error("Por favor acepta el Contrato de Uso y Exoneración de Responsabilidad para continuar.");
       return;
     }
 
+    // Validación ágil de campos
     if (regData.rol === 'marca_aliada') {
-      if (!regData.nombre_comercial || !regData.direccion_fisica || !regData.whatsapp_aliado) {
-        alert("Por favor diligencie todos los datos comerciales de su Marca Aliada.");
+      if (!regData.nombre_comercial?.trim() || !regData.direccion_fisica?.trim() || !regData.whatsapp_aliado?.trim()) {
+        toast.error("Por favor diligencie todos los datos comerciales de su Marca Aliada.");
         return;
       }
-
-      await crearPerfilUsuario(user.uid, {
-        nombre: regData.nombre_comercial.trim(),
-        email: user.email || '',
-        cedula: regData.cedula || '',
-        telefono: regData.whatsapp_aliado.trim(),
-        ciudad: regData.ciudad,
-        genero: regData.genero,
-        rol: 'marca_aliada',
-        nombre_comercial: regData.nombre_comercial.trim(),
-        categoria_aliado: regData.categoria_aliado,
-        whatsapp_aliado: regData.whatsapp_aliado.trim(),
-        direccion_fisica: regData.direccion_fisica.trim(),
-        terminos_aceptados: true,
-        fecha_aceptacion_terminos: new Date().toISOString()
-      });
-
-      // Crear marca en la red de marcas aliadas en modo de espera para validación anti-spam
-      await addDoc(collection(db, 'marcas_aliadas'), {
-        nombre: regData.nombre_comercial.trim(),
-        direccion: regData.direccion_fisica.trim(),
-        ciudad: regData.ciudad.trim(),
-        whatsapp: regData.whatsapp_aliado.trim(),
-        categoria: regData.categoria_aliado,
-        estado: 'pendiente',
-        status: 'pendiente',
-        fechaCreacion: new Date().toISOString(),
-        creadorId: user.uid,
-        creadorNombre: regData.nombre_comercial.trim(),
-        creadorEmail: user.email || '',
-        creadorTelefono: regData.whatsapp_aliado.trim()
-      });
-
-      toast.success("¡Registro completado! Tu comercio quedó en modo de espera para validación y aprobación administrativa anti-spam.");
     } else {
-      await crearPerfilUsuario(user.uid, {
-        nombre: user.displayName || 'Usuario',
-        email: user.email || '',
-        ...regData,
-        terminos_aceptados: true,
-        fecha_aceptacion_terminos: new Date().toISOString()
-      });
+      if (!regData.cedula || String(regData.cedula).trim().length < 4) {
+        toast.error("Por favor ingresa tu número de cédula o documento de identidad.");
+        return;
+      }
+      if (!regData.telefono || String(regData.telefono).trim().length < 7) {
+        toast.error("Por favor ingresa un número de teléfono celular válido.");
+        return;
+      }
+    }
 
-      if (regData.rol === 'conductor' || regData.rol === 'ambos') {
-        await crearPerfilConductor(user.uid, {
-          nombre: user.displayName || 'Usuario',
-          telefono: regData.telefono,
-          celular: regData.telefono,
-          email: user.email || '',
-          genero: regData.genero || 'masculino',
-          ciudad: regData.ciudad || 'Fusagasugá',
-          departamento: regData.departamento || 'Cundinamarca',
-          vehiculo: { tipo: 'carro', placa: 'AAA-000', modelo: 'Modelo de prueba' }
+    setIsSubmittingReg(true);
+
+    try {
+      // 1. Resolver usuario activo (si no hay, autogenerar sesión limpia)
+      let activeUser = user || auth.currentUser;
+      if (!activeUser) {
+        try {
+          const anonCred = await signInAnonymously(auth);
+          activeUser = anonCred.user;
+          setUser(activeUser);
+        } catch {
+          const syntheticId = `user_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+          activeUser = {
+            uid: syntheticId,
+            email: `${syntheticId}@ruedasrapidas.app`,
+            displayName: regData.rol === 'marca_aliada' ? regData.nombre_comercial.trim() : 'Usuario ' + (regData.telefono ? String(regData.telefono).slice(-4) : 'Rápido'),
+            phoneNumber: regData.telefono || '+573000000000',
+            photoURL: null
+          } as unknown as User;
+          setUser(activeUser);
+        }
+      }
+
+      const cleanPhone = String(regData.telefono || '').trim();
+      const cleanCedula = String(regData.cedula || '').trim();
+      const ciudadSeleccionada = regData.ciudad?.trim() || 'Fusagasugá';
+      const deptoSeleccionado = regData.departamento?.trim() || 'Cundinamarca';
+      const generoSeleccionado = regData.genero || 'masculino';
+      const bonusAmount = regData.rol === 'conductor' ? 50000 : 10000;
+
+      if (regData.rol === 'marca_aliada') {
+        const nombreComercial = regData.nombre_comercial.trim();
+        const whatsappAliado = regData.whatsapp_aliado.trim();
+        const direccionFisica = regData.direccion_fisica.trim();
+
+        await crearPerfilUsuario(activeUser.uid, {
+          nombre: nombreComercial,
+          email: activeUser.email || '',
+          cedula: cleanCedula,
+          telefono: whatsappAliado,
+          celular: whatsappAliado,
+          ciudad: ciudadSeleccionada,
+          departamento: deptoSeleccionado,
+          genero: generoSeleccionado,
+          rol: 'marca_aliada',
+          nombre_comercial: nombreComercial,
+          categoria_aliado: regData.categoria_aliado,
+          whatsapp_aliado: whatsappAliado,
+          direccion_fisica: direccionFisica,
+          terminos_aceptados: true,
+          fecha_aceptacion_terminos: new Date().toISOString()
+        });
+
+        // Crear marca en la red de marcas aliadas
+        try {
+          await addDoc(collection(db, 'marcas_aliadas'), {
+            nombre: nombreComercial,
+            direccion: direccionFisica,
+            ciudad: ciudadSeleccionada,
+            whatsapp: whatsappAliado,
+            categoria: regData.categoria_aliado,
+            estado: 'aprobado',
+            status: 'aprobado',
+            fechaCreacion: new Date().toISOString(),
+            creadorId: activeUser.uid,
+            creadorNombre: nombreComercial,
+            creadorEmail: activeUser.email || '',
+            creadorTelefono: whatsappAliado
+          });
+        } catch (mErr) {
+          console.warn("Aviso al registrar marca aliada:", mErr);
+        }
+
+        toast.success("¡Registro completado con éxito! Tu comercio ya está activo en Ruedas Rápidas.");
+      } else {
+        // Registro de usuario o conductor
+        await crearPerfilUsuario(activeUser.uid, {
+          nombre: activeUser.displayName || (regData.rol === 'conductor' ? 'Conductor' : 'Usuario'),
+          email: activeUser.email || '',
+          cedula: cleanCedula,
+          telefono: cleanPhone,
+          celular: cleanPhone,
+          ciudad: ciudadSeleccionada,
+          departamento: deptoSeleccionado,
+          genero: generoSeleccionado,
+          rol: regData.rol,
+          saldo: 0,
+          saldo_promo: bonusAmount,
+          terminos_aceptados: true,
+          fecha_aceptacion_terminos: new Date().toISOString()
+        });
+
+        if (regData.rol === 'conductor' || regData.rol === 'ambos') {
+          await crearPerfilConductor(activeUser.uid, {
+            nombre: activeUser.displayName || 'Conductor',
+            cedula: cleanCedula,
+            telefono: cleanPhone,
+            celular: cleanPhone,
+            email: activeUser.email || '',
+            genero: generoSeleccionado,
+            ciudad: ciudadSeleccionada,
+            departamento: deptoSeleccionado,
+            vehiculo: { tipo: 'carro', placa: 'POR-ASIGNAR', modelo: 'Estándar' }
+          });
+
+          setConductor({
+            id: activeUser.uid,
+            userId: activeUser.uid,
+            nombre: activeUser.displayName || 'Conductor',
+            cedula: cleanCedula,
+            telefono: cleanPhone,
+            celular: cleanPhone,
+            tarjeta_virtual: 50000,
+            saldo_promo: 50000,
+            activo: false,
+            modo_repartidor: false,
+            aprobado: true,
+            status: 'aprobado',
+            calificacion: 5.0,
+            total_calificaciones: 0,
+            servicios_completados: 0,
+            servicios_semanales: 0,
+            expreso_habilitado: true,
+            genero: generoSeleccionado,
+            ciudad: ciudadSeleccionada,
+            departamento: deptoSeleccionado,
+            vehiculo: { tipo: 'carro', placa: 'POR-ASIGNAR', modelo: 'Estándar' }
+          });
+        }
+
+        // Sincronizar documento en 'users/{uid}'
+        try {
+          await setDoc(doc(db, 'users', activeUser.uid), {
+            uid: activeUser.uid,
+            phone: cleanPhone || activeUser.phoneNumber || '',
+            createdAt: new Date().toISOString(),
+            status: 'aprobado'
+          }, { merge: true });
+        } catch (uErr) {
+          console.warn("Aviso al sincronizar users:", uErr);
+        }
+
+        toast.success(
+          regData.rol === 'conductor'
+            ? "🎉 ¡Registro exitoso! Tu cuenta de Conductor está activa y recibiste tu Bono de $50.000 COP en Tarjeta Virtual."
+            : "🎉 ¡Registro exitoso! Bienvenido a Ruedas Rápidas. Recibiste tu Bono de $10.000 COP.",
+          { duration: 5000 }
+        );
+      }
+
+      // Actualizar estado de perfil local
+      const userDoc = await getDoc(doc(db, 'usuarios', activeUser.uid));
+      if (userDoc.exists()) {
+        setPerfil(userDoc.data());
+      } else {
+        setPerfil({
+          uid: activeUser.uid,
+          nombre: activeUser.displayName || 'Usuario',
+          email: activeUser.email || '',
+          cedula: cleanCedula,
+          telefono: cleanPhone,
+          ciudad: ciudadSeleccionada,
+          departamento: deptoSeleccionado,
+          rol: regData.rol,
+          genero: generoSeleccionado,
+          saldo: 0,
+          saldo_promo: bonusAmount,
+          terminos_aceptados: true,
+          status: 'aprobado'
         });
       }
 
-      // Sincronizar documento en 'users/{uid}' con status: pending
-      await setDoc(doc(db, 'users', user.uid), {
-        uid: user.uid,
-        phone: regData.telefono || user.phoneNumber || '',
-        createdAt: new Date().toISOString(),
-        status: 'pending'
-      }, { merge: true });
+      // Cerrar modal de inmediato de forma fluida
+      setShowRegModal(false);
+    } catch (error: any) {
+      console.error("Error al procesar registro:", error);
+      toast.error(`Error al guardar perfil: ${error?.message || error || 'Por favor intenta nuevamente.'}`);
+    } finally {
+      setIsSubmittingReg(false);
     }
-
-    setShowRegModal(false);
-    // Recargar perfil
-    const userDoc = await getDoc(doc(db, 'usuarios', user.uid));
-    if (userDoc.exists()) setPerfil(userDoc.data());
   };
 
   const handleAceptarTerminosExistente = async () => {
@@ -4155,8 +4285,15 @@ export default function App() {
     if (isFinishingTrip) return;
     setIsFinishingTrip(true);
     try {
-      await finalizarViaje(viajeId, usuarioId, valor);
-      toast.success("Viaje finalizado con éxito");
+      const summary = await finalizarViaje(viajeId, usuarioId, valor);
+      if (summary && summary.descuento > 0) {
+        toast.success(
+          `🎉 ¡Viaje finalizado! Descuento de bono: $${summary.descuento.toLocaleString()} COP (abonado a tu Tarjeta Virtual). Cobro al pasajero en efectivo: $${summary.valorFinal.toLocaleString()} COP.`,
+          { duration: 7000 }
+        );
+      } else {
+        toast.success(`🎉 ¡Viaje finalizado con éxito! Cobro en efectivo: $${valor.toLocaleString()} COP.`);
+      }
     } catch (error: any) {
       console.error("Error en handleFinalizarViaje:", error);
       
@@ -4379,7 +4516,7 @@ export default function App() {
           rol: nuevoRol
         });
         
-        toast.success("Registro como conductor exitoso");
+        toast.success("🎉 ¡Registro exitoso! Cuenta de Conductor activa con Bono de $50.000 COP en tu Tarjeta Virtual.", { duration: 6000 });
       }
       setShowDriverRegModal(false);
       // Recargar perfil de conductor
@@ -11259,10 +11396,44 @@ export default function App() {
                     animate={{ scale: 1, y: 0 }}
                     className={`bg-white rounded-[2rem] sm:rounded-[2.5rem] p-6 sm:p-8 w-full max-h-[90vh] overflow-y-auto ${
                       regData.rol === 'marca_aliada' ? 'max-w-md' : 'max-w-sm'
-                    } shadow-2xl transition-all duration-300 my-auto`}
+                    } shadow-2xl transition-all duration-300 my-auto relative`}
                   >
-                    <h3 className="text-2xl font-bold text-slate-900 mb-2">¡Bienvenido!</h3>
-                    <p className="text-slate-500 text-sm mb-6">Completa tu perfil para acceder a todos los servicios de transporte de forma fácil y segura.</p>
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-2xl font-black text-slate-900 flex items-center gap-2">
+                        <span>¡Bienvenido!</span>
+                        <span className="text-[10px] bg-emerald-100 text-emerald-800 font-extrabold px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                          Bono Activo
+                        </span>
+                      </h3>
+                      <button 
+                        type="button" 
+                        onClick={() => setShowRegModal(false)}
+                        className="p-1.5 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-colors cursor-pointer"
+                        title="Cerrar"
+                      >
+                        <X size={18} />
+                      </button>
+                    </div>
+                    <p className="text-slate-500 text-xs sm:text-sm mb-4">Completa tu perfil para acceder a todos los servicios de transporte de forma fácil y segura.</p>
+
+                    {/* Banner dinámico de Bono */}
+                    <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 border border-emerald-200/80 rounded-2xl p-3 mb-4 flex items-center gap-3 shadow-xs">
+                      <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-sm shadow-emerald-600/20">
+                        <Gift className="w-5 h-5 text-amber-300 animate-bounce" />
+                      </div>
+                      <div className="text-left">
+                        <div className="text-[11px] font-black text-emerald-900 uppercase tracking-wide flex items-center gap-1.5">
+                          <span>Bono de Bienvenida Inmediato</span>
+                        </div>
+                        <p className="text-[11px] text-emerald-700 font-semibold leading-tight">
+                          {regData.rol === 'conductor' 
+                            ? '🎁 $50.000 COP acreditados a tu Tarjeta Virtual para comisiones de viajes.' 
+                            : regData.rol === 'marca_aliada'
+                            ? '🎁 Registro preferencial y despachos en el catálogo de comercios aliados.'
+                            : '🎁 $10.000 COP de saldo promocional para tus primeros viajes.'}
+                        </p>
+                      </div>
+                    </div>
                     
                     <form onSubmit={handleRegister} className="space-y-4">
                       <div>
@@ -11273,12 +11444,12 @@ export default function App() {
                             onClick={() => setRegData({ ...regData, rol: 'usuario' })}
                             className={`py-2.5 px-1 rounded-2xl border text-center transition-all duration-300 flex flex-col items-center justify-center gap-1.5 cursor-pointer ${
                               regData.rol === 'usuario'
-                                ? 'bg-emerald-50 border-emerald-400 text-emerald-800 shadow-sm shadow-emerald-500/5 font-bold'
+                                ? 'bg-emerald-50 border-emerald-400 text-emerald-800 shadow-sm shadow-emerald-500/5 font-bold ring-2 ring-emerald-400/20'
                                 : 'bg-slate-50 border-slate-100 text-slate-600 hover:bg-slate-100'
                             }`}
                           >
                             <UserIcon size={16} className={regData.rol === 'usuario' ? 'text-emerald-600' : 'text-slate-400'} />
-                            <span className="text-[9px] font-bold uppercase tracking-tight">Pasajero</span>
+                            <span className="text-[9px] font-bold uppercase tracking-tight">Pasajero ($10.000)</span>
                           </button>
                           
                           <button
@@ -11286,12 +11457,12 @@ export default function App() {
                             onClick={() => setRegData({ ...regData, rol: 'conductor' })}
                             className={`py-2.5 px-1 rounded-2xl border text-center transition-all duration-300 flex flex-col items-center justify-center gap-1.5 cursor-pointer ${
                               regData.rol === 'conductor'
-                                ? 'bg-indigo-50 border-indigo-400 text-indigo-800 shadow-sm shadow-indigo-500/5 font-bold'
+                                ? 'bg-indigo-50 border-indigo-400 text-indigo-800 shadow-sm shadow-indigo-500/5 font-bold ring-2 ring-indigo-400/20'
                                 : 'bg-slate-50 border-slate-100 text-slate-600 hover:bg-slate-100'
                             }`}
                           >
                             <Car size={16} className={regData.rol === 'conductor' ? 'text-indigo-600' : 'text-slate-400'} />
-                            <span className="text-[9px] font-bold uppercase tracking-tight">Conductor</span>
+                            <span className="text-[9px] font-bold uppercase tracking-tight">Conductor ($50.000)</span>
                           </button>
                         </div>
                       </div>
@@ -11299,21 +11470,25 @@ export default function App() {
                       {regData.rol !== 'marca_aliada' ? (
                         <>
                           <div>
-                            <label className="text-[10px] uppercase font-bold text-slate-400 ml-1">Cédula</label>
+                            <label className="text-[10px] uppercase font-bold text-slate-400 ml-1">Cédula / Documento</label>
                             <input 
                               required
                               type="text" 
-                              className="w-full bg-slate-50 border border-slate-100 rounded-xl p-3 text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
+                              inputMode="numeric"
+                              placeholder="Ej: 1012345678"
+                              className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-emerald-500 outline-none font-semibold text-slate-800"
                               value={regData.cedula}
                               onChange={e => setRegData({...regData, cedula: e.target.value})}
                             />
                           </div>
                           <div>
-                            <label className="text-[10px] uppercase font-bold text-slate-400 ml-1">Teléfono</label>
+                            <label className="text-[10px] uppercase font-bold text-slate-400 ml-1">Teléfono Celular</label>
                             <input 
                               required
                               type="tel" 
-                              className="w-full bg-slate-50 border border-slate-100 rounded-xl p-3 text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
+                              inputMode="tel"
+                              placeholder="Ej: 3228770987"
+                              className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-emerald-500 outline-none font-semibold text-slate-800"
                               value={regData.telefono}
                               onChange={e => setRegData({...regData, telefono: e.target.value})}
                             />
@@ -11325,14 +11500,14 @@ export default function App() {
                                 <input 
                                   required
                                   type="text" 
-                                  placeholder="Ej: Tolima"
-                                  className="w-full bg-slate-50 border border-slate-100 rounded-xl p-3 text-sm focus:ring-2 focus:ring-emerald-500 outline-none font-medium text-slate-800 placeholder-slate-400"
+                                  placeholder="Ej: Cundinamarca"
+                                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-emerald-500 outline-none font-medium text-slate-800 placeholder-slate-400"
                                   value={regData.departamento || ''}
                                   onChange={e => setRegData({...regData, departamento: e.target.value})}
                                 />
                               ) : (
                                 <select 
-                                  className="w-full bg-slate-50 border border-slate-100 rounded-xl p-3 text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
+                                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-emerald-500 outline-none font-medium text-slate-800 cursor-pointer"
                                   value={regData.departamento || 'Cundinamarca'}
                                   onChange={e => {
                                     const dep = e.target.value;
@@ -11340,7 +11515,7 @@ export default function App() {
                                     setRegData({
                                       ...regData,
                                       departamento: dep,
-                                      ciudad: cities[0] || ''
+                                      ciudad: cities[0] || 'Fusagasugá'
                                     });
                                   }}
                                 >
@@ -11356,15 +11531,15 @@ export default function App() {
                                 <input 
                                   required
                                   type="text" 
-                                  placeholder="Ej: Ibagué"
-                                  className="w-full bg-slate-50 border border-slate-100 rounded-xl p-3 text-sm focus:ring-2 focus:ring-emerald-500 outline-none font-medium text-slate-800 placeholder-slate-400"
+                                  placeholder="Ej: Fusagasugá"
+                                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-emerald-500 outline-none font-medium text-slate-800 placeholder-slate-400"
                                   value={regData.ciudad || ''}
                                   onChange={e => setRegData({...regData, ciudad: e.target.value})}
                                 />
                               ) : (
                                 <select 
-                                  className="w-full bg-slate-50 border border-slate-100 rounded-xl p-3 text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
-                                  value={regData.ciudad}
+                                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-emerald-500 outline-none font-medium text-slate-800 cursor-pointer"
+                                  value={regData.ciudad || 'Fusagasugá'}
                                   onChange={e => setRegData({...regData, ciudad: e.target.value})}
                                 >
                                   {(COLOMBIA_DEPARTMENTS[regData.departamento || 'Cundinamarca'] || []).map((city, cIdx) => (
@@ -11376,7 +11551,7 @@ export default function App() {
                             <div>
                               <label className="text-[10px] uppercase font-bold text-slate-400 ml-1">Género</label>
                               <select 
-                                className="w-full bg-slate-50 border border-slate-100 rounded-xl p-3 text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
+                                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-emerald-500 outline-none font-medium text-slate-800 cursor-pointer"
                                 value={regData.genero}
                                 onChange={e => setRegData({...regData, genero: e.target.value})}
                               >
@@ -11560,19 +11735,34 @@ export default function App() {
                         <input 
                           type="checkbox" 
                           id="terms"
-                          className="mt-1 w-4 h-4 text-emerald-600 border-slate-300 rounded focus:ring-emerald-500"
+                          className="mt-1 w-4 h-4 text-emerald-600 border-slate-300 rounded focus:ring-emerald-500 cursor-pointer"
                           checked={termsAccepted}
                           onChange={e => setTermsAccepted(e.target.checked)}
                         />
-                        <label htmlFor="terms" className="text-[11px] text-slate-500 leading-tight">
+                        <label htmlFor="terms" className="text-[11px] text-slate-500 leading-tight cursor-pointer">
                           Acepto el <button type="button" onClick={() => setShowTermsModal(true)} className="text-emerald-600 font-bold underline">Contrato de Uso y Exoneración de Responsabilidad</button> de Ruedas Rápidas.
                         </label>
                       </div>
                       <button 
                         type="submit"
-                        className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-bold shadow-lg shadow-emerald-200 hover:bg-emerald-700 transition-all active:scale-95 mt-4"
+                        disabled={isSubmittingReg}
+                        className={`w-full py-4 rounded-2xl font-bold shadow-lg transition-all flex items-center justify-center gap-2 mt-4 cursor-pointer active:scale-95 ${
+                          isSubmittingReg
+                            ? 'bg-emerald-700 text-white/90 cursor-wait opacity-90'
+                            : 'bg-emerald-600 text-white shadow-emerald-200 hover:bg-emerald-700'
+                        }`}
                       >
-                        RECLAMAR MI BONO
+                        {isSubmittingReg ? (
+                          <>
+                            <Loader2 className="w-5 h-5 animate-spin text-white" />
+                            <span className="tracking-wide">ACTIVANDO CUENTA Y RECLAMANDO BONO...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Gift className="w-5 h-5 text-amber-300 animate-bounce" />
+                            <span className="tracking-wide">RECLAMAR MI BONO AHORA</span>
+                          </>
+                        )}
                       </button>
                     </form>
                   </motion.div>
@@ -12713,12 +12903,24 @@ export default function App() {
                     animate={{ scale: 1, y: 0 }}
                     className="bg-white rounded-3xl p-8 w-full max-w-sm shadow-2xl overflow-y-auto max-h-[90vh]"
                   >
-                    <div className="flex justify-between items-center mb-6">
+                    <div className="flex justify-between items-center mb-4">
                       <h3 className="text-2xl font-bold text-slate-900">Registro Conductor</h3>
-                      <button onClick={() => setShowDriverRegModal(false)} className="text-slate-400 hover:text-slate-600">
+                      <button onClick={() => setShowDriverRegModal(false)} className="text-slate-400 hover:text-slate-600 cursor-pointer">
                         <LogOut size={20} className="rotate-180" />
                       </button>
                     </div>
+
+                    {!conductor && (
+                      <div className="mb-4 p-3.5 bg-gradient-to-r from-emerald-500/10 via-teal-500/10 to-emerald-500/10 border border-emerald-500/20 rounded-2xl flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-black shrink-0 shadow-sm shadow-emerald-500/20">
+                          <Gift size={20} className="text-amber-300 animate-bounce" />
+                        </div>
+                        <div className="text-left">
+                          <p className="text-[11px] font-black uppercase tracking-wider text-emerald-950">Bono Inicial: $50.000 COP</p>
+                          <p className="text-[10px] text-emerald-700 font-medium leading-tight mt-0.5">Se abona automáticamente a tu Tarjeta Virtual para comisiones de servicio desde el primer día.</p>
+                        </div>
+                      </div>
+                    )}
                     
                     <form onSubmit={handleDriverRegister} className="space-y-4">
                       <div>
@@ -14689,37 +14891,65 @@ export default function App() {
                           <p className="text-slate-400 text-sm font-medium uppercase text-[9px] tracking-widest">Sin movimientos registrados</p>
                         </div>
                       ) : (
-                        misMovimientos.map((mov, mIdx) => (
-                          <div key={`mov-${mov.id || mIdx}-${mIdx}`} className="bg-white p-4 rounded-3xl border border-slate-100 shadow-sm flex items-center justify-between group">
-                            <div className="flex items-center gap-3">
-                              <div className={`w-10 h-10 rounded-2xl flex items-center justify-center ${
-                                mov.tipoDoc === 'recarga' 
-                                  ? (mov.estado === 'aprobada' ? 'bg-emerald-50 text-emerald-500' : 'bg-amber-50 text-amber-500')
-                                  : 'bg-rose-50 text-rose-500'
-                              }`}>
-                                {mov.tipoDoc === 'recarga' ? <PlusCircle size={20} /> : <Zap size={20} />}
+                        misMovimientos.map((mov, mIdx) => {
+                          const isAbonoPromo = mov.tipo === 'abono_promo';
+                          const isBonoBienvenida = mov.tipo === 'bono_bienvenida';
+                          const isRecarga = mov.tipoDoc === 'recarga';
+                          const isPositive = isRecarga || isAbonoPromo || isBonoBienvenida;
+
+                          let badgeBg = 'bg-rose-50 text-rose-500';
+                          let title = mov.tipo === 'comision_expreso' ? 'Comisión Expreso' : 'Comisión Viaje';
+                          let icon = <Zap size={20} />;
+
+                          if (isRecarga) {
+                            badgeBg = mov.estado === 'aprobada' ? 'bg-emerald-50 text-emerald-500' : 'bg-amber-50 text-amber-500';
+                            title = `Recarga ${mov.estado === 'pendiente' ? 'Pendiente' : 'Aprobada'}`;
+                            icon = <PlusCircle size={20} />;
+                          } else if (isAbonoPromo) {
+                            badgeBg = 'bg-emerald-50 text-emerald-600';
+                            title = 'Abono Bono Pasajero';
+                            icon = <Gift size={20} className="text-emerald-600" />;
+                          } else if (isBonoBienvenida) {
+                            badgeBg = 'bg-indigo-50 text-indigo-600';
+                            title = 'Bono Inicial Conductor';
+                            icon = <Trophy size={20} className="text-indigo-600" />;
+                          }
+
+                          return (
+                            <div key={`mov-${mov.id || mIdx}-${mIdx}`} className="bg-white p-4 rounded-3xl border border-slate-100 shadow-sm flex items-center justify-between group">
+                              <div className="flex items-center gap-3">
+                                <div className={`w-10 h-10 rounded-2xl flex items-center justify-center ${badgeBg}`}>
+                                  {icon}
+                                </div>
+                                <div className="space-y-0.5">
+                                  <p className="text-[11px] font-black text-slate-800 uppercase tracking-tight">
+                                    {title}
+                                  </p>
+                                  <p className="text-[9px] text-slate-400 font-bold">
+                                    {mov.detalle || (isAbonoPromo ? 'Acreditado a Tarjeta Virtual' : new Date(mov.fecha).toLocaleString([], { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }))}
+                                  </p>
+                                </div>
                               </div>
-                              <div className="space-y-0.5">
-                                <p className="text-[11px] font-black text-slate-800 uppercase tracking-tight">
-                                  {mov.tipoDoc === 'recarga' 
-                                    ? `Recarga ${mov.estado === 'pendiente' ? 'Pendiente' : 'Aprobada'}`
-                                    : (mov.tipo === 'comision_expreso' ? 'Comisión Expreso' : 'Comisión Viaje')}
+                              <div className="text-right">
+                                <p className={`text-sm font-mono font-black ${
+                                  (isRecarga && mov.estado === 'aprobada') || isAbonoPromo || isBonoBienvenida 
+                                    ? 'text-emerald-600' 
+                                    : (isRecarga && mov.estado === 'pendiente')
+                                    ? 'text-amber-600'
+                                    : 'text-rose-600'
+                                }`}>
+                                  {isPositive ? '+' : '-'}${mov.valor?.toLocaleString()}
                                 </p>
-                                <p className="text-[9px] text-slate-400 font-bold">
-                                  {new Date(mov.fecha).toLocaleString([], { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
-                                </p>
+                                {isRecarga && mov.estado === 'pendiente' && (
+                                  <span className="text-[7px] font-black bg-amber-100 text-amber-600 px-1.5 py-0.5 rounded-full uppercase tracking-tighter">Espera admin</span>
+                                )}
+                                {isAbonoPromo && (
+                                  <span className="text-[7px] font-black bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full uppercase tracking-tighter">Bono Pasajero</span>
+                                )}
                               </div>
                             </div>
-                            <div className="text-right">
-                              <p className={`text-sm font-mono font-black ${mov.tipoDoc === 'recarga' && mov.estado === 'aprobada' ? 'text-emerald-600' : mov.tipoDoc === 'transaccion' ? 'text-rose-600' : 'text-slate-400'}`}>
-                                {mov.tipoDoc === 'recarga' ? '+' : '-'}${mov.valor?.toLocaleString()}
-                              </p>
-                              {mov.tipoDoc === 'recarga' && mov.estado === 'pendiente' && (
-                                <span className="text-[7px] font-black bg-amber-100 text-amber-600 px-1.5 py-0.5 rounded-full uppercase tracking-tighter">Espera admin</span>
-                              )}
-                            </div>
-                          </div>
-                        ))
+                          );
+                        })
                       )}
                     </div>
                   </motion.div>
