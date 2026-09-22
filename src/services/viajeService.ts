@@ -1,4 +1,4 @@
-import { doc, runTransaction, serverTimestamp, collection, addDoc, setDoc, getDoc, updateDoc, writeBatch, query, where, getDocs, increment, deleteField } from 'firebase/firestore';
+import { doc, runTransaction, serverTimestamp, collection, addDoc, setDoc, getDoc, updateDoc, writeBatch, query, where, getDocs, increment, deleteField, deleteDoc } from 'firebase/firestore';
 import { db, auth } from '../firebase';
 import { getSyncedISOString } from './clockService';
 import { submitOffer, acceptOffer } from './offerService';
@@ -1227,4 +1227,85 @@ export async function marcarMensajesChatLeidos(chatId: string, currentUserId: st
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, 'mensajes_admin_batch');
   }
+}
+
+/**
+ * Elimina de manera definitiva un usuario (inactivo, spam o a criterio del administrador).
+ */
+export async function eliminarUsuario(userId: string): Promise<void> {
+  const userRef = doc(db, 'usuarios', userId);
+  try {
+    await deleteDoc(userRef);
+    // Limpieza complementaria en colección users si existe
+    try {
+      await deleteDoc(doc(db, 'users', userId));
+    } catch {
+      // noop
+    }
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, `usuarios/${userId}`);
+  }
+}
+
+/**
+ * Elimina de manera definitiva un conductor (inactivo, spam o a criterio del administrador).
+ */
+export async function eliminarConductor(conductorId: string): Promise<void> {
+  const condRef = doc(db, 'conductores', conductorId);
+  try {
+    await deleteDoc(condRef);
+    // Limpieza complementaria en drivers y ubicaciones si existen
+    try {
+      await deleteDoc(doc(db, 'drivers', conductorId));
+    } catch {
+      // noop
+    }
+    try {
+      await deleteDoc(doc(db, 'drivers_location', conductorId));
+    } catch {
+      // noop
+    }
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, `conductores/${conductorId}`);
+  }
+}
+
+/**
+ * Elimina de manera definitiva un comercio o marca aliada.
+ */
+export async function eliminarAliado(aliadoId: string): Promise<void> {
+  const marcaRef = doc(db, 'marcas_aliadas', aliadoId);
+  try {
+    await deleteDoc(marcaRef);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, `marcas_aliadas/${aliadoId}`);
+  }
+}
+
+/**
+ * Elimina un lote de entidades seleccionadas por el administrador de forma ágil y segura.
+ */
+export async function eliminarLoteEntidades(
+  items: { id: string; tipo: 'usuario' | 'conductor' | 'aliado' }[]
+): Promise<{ exitosos: number; fallidos: number }> {
+  let exitosos = 0;
+  let fallidos = 0;
+
+  for (const item of items) {
+    try {
+      if (item.tipo === 'usuario') {
+        await eliminarUsuario(item.id);
+      } else if (item.tipo === 'conductor') {
+        await eliminarConductor(item.id);
+      } else if (item.tipo === 'aliado') {
+        await eliminarAliado(item.id);
+      }
+      exitosos++;
+    } catch (err) {
+      console.error(`Error al eliminar ${item.tipo} con id ${item.id}:`, err);
+      fallidos++;
+    }
+  }
+
+  return { exitosos, fallidos };
 }

@@ -19,7 +19,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
   AreaChart, Area, PieChart, Pie, LineChart, Line
 } from 'recharts';
-import { handleFirestoreError, OperationType, crearPerfilUsuario, finalizarViaje, aceptarViaje, ofertarViaje, crearPerfilConductor, solicitarRecarga, aprobarRecarga, rechazarRecarga, toggleEstadoConductor, toggleModoRepartidor, seleccionarOferta, actualizarEstadoViaje, calificarConductor, toggleBloqueoUsuario, toggleBloqueoConductor, toggleAdminSuplente, enviarMensajeAdmin, marcarMensajesChatLeidos, cancelarViajeConductor, recargaManual, ajustarSaldoUsuario, cancelarViajeUsuario, crearViajeExpreso, reservarCupoExpreso, cancelarViajeExpreso, cancelarReservaExpreso, cancelarViajePorAdministrador } from './services/viajeService';
+import { handleFirestoreError, OperationType, crearPerfilUsuario, finalizarViaje, aceptarViaje, ofertarViaje, crearPerfilConductor, solicitarRecarga, aprobarRecarga, rechazarRecarga, toggleEstadoConductor, toggleModoRepartidor, seleccionarOferta, actualizarEstadoViaje, calificarConductor, toggleBloqueoUsuario, toggleBloqueoConductor, toggleAdminSuplente, enviarMensajeAdmin, marcarMensajesChatLeidos, cancelarViajeConductor, recargaManual, ajustarSaldoUsuario, cancelarViajeUsuario, crearViajeExpreso, reservarCupoExpreso, cancelarViajeExpreso, cancelarReservaExpreso, cancelarViajePorAdministrador, eliminarUsuario, eliminarConductor, eliminarAliado, eliminarLoteEntidades } from './services/viajeService';
 import { Car, Bike, Package, User as UserIcon, LogOut, ShieldCheck, CreditCard, MapPin, Heart, Shield, Truck, PlusCircle, Check, X, Star, ChevronRight, ChevronDown, ChevronUp, Clock, Lock, Unlock, ShieldAlert, AlertCircle, Info, Zap, MessageCircle, Headphones, Navigation, AlertTriangle, Search, FileText, CheckCircle2, Trophy, Medal, Users, Calendar, XCircle, Power, Store, Edit, Utensils, ShoppingBag, Smartphone, Wrench, Pill, TrendingUp, TrendingDown, Target, Coins, FileSpreadsheet, Upload, Image, ArrowLeftRight, Tag, UserCheck, ArrowRight, Trash2, Eye, Filter, CheckCheck, RefreshCw, SlidersHorizontal, Ban, Loader2, Sparkles, Gift } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ErrorBoundary } from './components/ErrorBoundary';
@@ -33,6 +33,8 @@ import { CountdownTimer } from './components/CountdownTimer';
 import { UserTripPanel } from './components/UserTripPanel';
 import { DriverTripPanel } from './components/DriverTripPanel';
 import { CalificacionModal } from './components/CalificacionModal';
+import { AdminDeleteConfirmModal } from './components/AdminDeleteConfirmModal';
+import { AdminDepuracionTab } from './components/AdminDepuracionTab';
 import { calculateNationalSuggestedPrice, formatCOP } from './services/offerService';
 import { getSyncedISOString, getSyncedDate, syncClock } from './services/clockService';
 import { escucharChatsSoporte, SoporteChat, marcarComoLeidoSoporte } from './services/supportService';
@@ -399,6 +401,11 @@ function AdminDriverBlockBadge({ cond }: { cond: any }) {
     </span>
   );
 }
+
+// --- Helper Functions for Allied Brands Status & Moderation ---
+export const isMarcaAprobada = (m: any) => m?.estado === 'aprobado' || m?.status === 'aprobado' || (!m?.estado && !m?.creadorId);
+export const isMarcaPendiente = (m: any) => m?.estado === 'pendiente' || m?.status === 'pendiente' || (m?.creadorId && !m?.estado && m?.status !== 'aprobado' && m?.status !== 'rechazado');
+export const isMarcaRechazada = (m: any) => m?.estado === 'rechazado' || m?.status === 'rechazado';
 
 // --- Main App Component ---
 export default function App() {
@@ -1089,7 +1096,7 @@ export default function App() {
     }
   };
 
-  const [adminSubTab, setAdminSubTab] = useState<'resumen' | 'recargas' | 'conductores' | 'usuarios' | 'espera' | 'alertas' | 'soporte' | 'historial' | 'ranking' | 'aliados' | 'activacion'>('resumen');
+  const [adminSubTab, setAdminSubTab] = useState<'resumen' | 'recargas' | 'conductores' | 'usuarios' | 'espera' | 'alertas' | 'soporte' | 'historial' | 'ranking' | 'aliados' | 'activacion' | 'depuracion'>('resumen');
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
   const [allUsers, setAllUsers] = useState<any[]>([]);
   const [userSearchTerm, setUserSearchTerm] = useState('');
@@ -2074,6 +2081,180 @@ export default function App() {
   const [regManualUbicacion, setRegManualUbicacion] = useState(false);
   const [driverRegManualUbicacion, setDriverRegManualUbicacion] = useState(false);
   const [profileManualUbicacion, setProfileManualUbicacion] = useState(false);
+
+  // States for Admin Purge / Deletion Feature (Usuarios, Conductores, Aliados)
+  const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
+  const [deleteTargetItem, setDeleteTargetItem] = useState<{
+    id: string;
+    tipo: 'usuario' | 'conductor' | 'aliado';
+    nombre: string;
+    email?: string;
+    telefono?: string;
+    motivoSugerido?: string;
+    detalles?: string;
+  } | null>(null);
+  const [deleteBatchItems, setDeleteBatchItems] = useState<{
+    id: string;
+    tipo: 'usuario' | 'conductor' | 'aliado';
+    nombre: string;
+    email?: string;
+    telefono?: string;
+    detalles?: string;
+  }[]>([]);
+  const [isDeletingEntity, setIsDeletingEntity] = useState(false);
+  const [deleteReasonSelection, setDeleteReasonSelection] = useState<string>('Inactividad prolongada (0 servicios)');
+  const [deleteReasonCustom, setDeleteReasonCustom] = useState<string>('');
+
+  // States for Depuración Tab
+  const [depuracionEntityType, setDepuracionEntityType] = useState<'usuarios' | 'conductores' | 'aliados'>('usuarios');
+  const [depuracionFilter, setDepuracionFilter] = useState<'todos' | 'spam' | 'inactivos'>('todos');
+  const [depuracionSearchTerm, setDepuracionSearchTerm] = useState('');
+  const [selectedDepuracionIds, setSelectedDepuracionIds] = useState<string[]>([]);
+
+  // Status Check Helpers
+  const checkUserStatus = (u: any) => {
+    const isProtected = u.id === user?.uid || u.rol === 'admin' || u.email === 'darwin.barbosa000@gmail.com' || u.email === 'ruedasrapidasviajaseguro@gmail.com';
+    const isSpam = !isProtected && (
+      Boolean(u.bloqueado) || 
+      !u.telefono || 
+      String(u.telefono).trim().length < 7 || 
+      /test|demo|spam|prueba|asdf|fake/i.test(u.nombre || '') || 
+      /test|demo|spam|prueba|fake/i.test(u.email || '') ||
+      ((u.servicios_perdidos || 0) >= 3 && (u.servicios_count || 0) === 0)
+    );
+    const isInactive = !isProtected && !isSpam && (
+      (u.servicios_count || 0) === 0 && (u.servicios_perdidos || 0) === 0
+    );
+    return { isProtected, isSpam, isInactive };
+  };
+
+  const checkDriverStatus = (d: any) => {
+    const isProtected = Boolean(d.en_servicio);
+    const isSpam = Boolean(d.bloqueado) || 
+      !d.vehiculo?.placa || 
+      /000|test|demo|xxx/i.test(d.vehiculo?.placa || '') ||
+      (!d.documentos_autorizados?.licencia && !d.documentos_autorizados?.soat && !d.documentos_autorizados?.cedula);
+    const isInactive = !isSpam && (d.servicios_completados || 0) === 0 && !d.activo && (!d.tarjeta_virtual || d.tarjeta_virtual <= 0);
+    return { isProtected, isSpam, isInactive };
+  };
+
+  const checkAliadoStatus = (m: any) => {
+    const isSpam = isMarcaRechazada(m) || !m.whatsapp || String(m.whatsapp).trim().length < 7 || /test|prueba|demo/i.test(m.nombre || '');
+    const isInactive = !isSpam && (!m.direccion || String(m.direccion).trim().length < 3);
+    return { isProtected: false, isSpam, isInactive };
+  };
+
+  const totalSpamOInactivos = useMemo(() => {
+    const uCount = allUsers.filter(u => {
+      const st = checkUserStatus(u);
+      return st.isSpam || st.isInactive;
+    }).length;
+    const dCount = allDrivers.filter(d => {
+      const st = checkDriverStatus(d);
+      return st.isSpam || st.isInactive;
+    }).length;
+    const aCount = marcasAliadas.filter(m => {
+      const st = checkAliadoStatus(m);
+      return st.isSpam || st.isInactive;
+    }).length;
+    return uCount + dCount + aCount;
+  }, [allUsers, allDrivers, marcasAliadas, user]);
+
+  const abrirModalEliminar = (target: {
+    id: string;
+    tipo: 'usuario' | 'conductor' | 'aliado';
+    nombre: string;
+    email?: string;
+    telefono?: string;
+    motivoSugerido?: string;
+    detalles?: string;
+  }) => {
+    if (target.tipo === 'usuario') {
+      if (target.id === user?.uid) {
+        toast.error("Por seguridad, no puedes eliminar tu propia cuenta de administrador.");
+        return;
+      }
+      if (target.email === 'darwin.barbosa000@gmail.com' || target.email === 'ruedasrapidasviajaseguro@gmail.com') {
+        toast.error("Esta es una cuenta raíz de superadministrador y está protegida contra eliminación.");
+        return;
+      }
+    }
+    if (target.tipo === 'conductor') {
+      const cond = allDrivers.find(d => d.id === target.id);
+      if (cond?.en_servicio) {
+        toast.error("No se puede eliminar un conductor con un servicio activo en curso.");
+        return;
+      }
+    }
+
+    setDeleteTargetItem(target);
+    setDeleteBatchItems([]);
+    setDeleteReasonSelection(target.motivoSugerido || 'Inactividad prolongada (0 servicios)');
+    setDeleteReasonCustom('');
+    setShowDeleteConfirmModal(true);
+  };
+
+  const abrirModalEliminarLote = (items: {
+    id: string;
+    tipo: 'usuario' | 'conductor' | 'aliado';
+    nombre: string;
+    email?: string;
+    telefono?: string;
+    detalles?: string;
+  }[]) => {
+    const filtered = items.filter(it => {
+      if (it.tipo === 'usuario') {
+        if (it.id === user?.uid) return false;
+        if (it.email === 'darwin.barbosa000@gmail.com' || it.email === 'ruedasrapidasviajaseguro@gmail.com') return false;
+      }
+      return true;
+    });
+
+    if (filtered.length === 0) {
+      toast.error("No hay registros válidos para eliminar. Las cuentas protegidas no pueden ser seleccionadas.");
+      return;
+    }
+
+    setDeleteTargetItem(null);
+    setDeleteBatchItems(filtered);
+    setDeleteReasonSelection('Depuración masiva de cuentas inactivas o spam');
+    setDeleteReasonCustom('');
+    setShowDeleteConfirmModal(true);
+  };
+
+  const ejecutarEliminacionDefinitiva = async () => {
+    setIsDeletingEntity(true);
+    try {
+      if (deleteTargetItem) {
+        if (deleteTargetItem.tipo === 'usuario') {
+          await eliminarUsuario(deleteTargetItem.id);
+          toast.success(`Usuario "${deleteTargetItem.nombre}" eliminado definitivamente.`);
+        } else if (deleteTargetItem.tipo === 'conductor') {
+          await eliminarConductor(deleteTargetItem.id);
+          toast.success(`Conductor "${deleteTargetItem.nombre}" eliminado definitivamente.`);
+        } else if (deleteTargetItem.tipo === 'aliado') {
+          await eliminarAliado(deleteTargetItem.id);
+          toast.success(`Comercio "${deleteTargetItem.nombre}" eliminado de la plataforma.`);
+        }
+        setSelectedDepuracionIds(prev => prev.filter(id => id !== deleteTargetItem.id));
+      } else if (deleteBatchItems.length > 0) {
+        const resultado = await eliminarLoteEntidades(deleteBatchItems);
+        toast.success(`¡Depuración masiva completada! Se eliminaron ${resultado.exitosos} registros con éxito.`);
+        if (resultado.fallidos > 0) {
+          toast.error(`${resultado.fallidos} registros no pudieron ser eliminados.`);
+        }
+        setSelectedDepuracionIds([]);
+      }
+      setShowDeleteConfirmModal(false);
+      setDeleteTargetItem(null);
+      setDeleteBatchItems([]);
+    } catch (error) {
+      console.error("Error al eliminar:", error);
+      toast.error("Error al procesar la eliminación");
+    } finally {
+      setIsDeletingEntity(false);
+    }
+  };
 
   // --- Auto-Unblock Check for Current Driver ---
   useEffect(() => {
@@ -3906,11 +4087,6 @@ export default function App() {
       toast.error("Ocurrió un error al generar el archivo para Google Sheets.");
     }
   };
-
-  // --- Helper Functions for Allied Brands Status & Anti-Spam ---
-  const isMarcaAprobada = (m: any) => m?.estado === 'aprobado' || m?.status === 'aprobado' || (!m?.estado && !m?.creadorId);
-  const isMarcaPendiente = (m: any) => m?.estado === 'pendiente' || m?.status === 'pendiente' || (m?.creadorId && !m?.estado && m?.status !== 'aprobado' && m?.status !== 'rechazado');
-  const isMarcaRechazada = (m: any) => m?.estado === 'rechazado' || m?.status === 'rechazado';
 
   const guardarMarcaAliada = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -7738,7 +7914,8 @@ export default function App() {
                           { id: 'ranking', label: 'Ranking', icon: Trophy },
                           { id: 'alertas', label: 'Alertas', icon: ShieldAlert },
                           { id: 'soporte', label: 'Soporte', icon: Headphones },
-                          { id: 'aliados', label: 'Aliados', icon: Store }
+                          { id: 'aliados', label: 'Aliados', icon: Store },
+                          { id: 'depuracion', label: 'Depuración & Spam', icon: Trash2 }
                         ].map((tab, tIdx) => (
                           <button 
                             key={`admin-subtab-${tab.id}-${tIdx}`}
@@ -7748,8 +7925,9 @@ export default function App() {
                           <tab.icon size={14} className={
                             (tab.id === 'recargas' && recargasPendientes.length > 0) || 
                             (tab.id === 'espera' && unattendedTrips.length > 0) ||
-                            (tab.id === 'aliados' && marcasAliadas.filter(isMarcaPendiente).length > 0)
-                            ? "text-red-500" : ""
+                            (tab.id === 'aliados' && marcasAliadas.filter(isMarcaPendiente).length > 0) ||
+                            (tab.id === 'depuracion' && totalSpamOInactivos > 0)
+                            ? "text-rose-500" : ""
                           } />
                           <span className="relative">
                             {tab.label}
@@ -7769,6 +7947,11 @@ export default function App() {
                             )}
                             {tab.id === 'aliados' && marcasAliadas.filter(isMarcaPendiente).length > 0 && (
                               <span className="absolute -right-1.5 -top-1 w-1.5 h-1.5 bg-amber-500 rounded-full animate-pulse" />
+                            )}
+                            {tab.id === 'depuracion' && totalSpamOInactivos > 0 && (
+                              <span className="absolute -right-2 -top-1 px-1.5 min-w-[14px] h-3.5 bg-rose-500 text-white text-[8px] font-black flex items-center justify-center rounded-full shadow-xs">
+                                {totalSpamOInactivos}
+                              </span>
                             )}
                           </span>
                           {tab.id === 'recargas' && recargasPendientes.length > 0 && (
@@ -8868,6 +9051,27 @@ export default function App() {
                                       {cond.bloqueado ? <Unlock size={18} /> : <Lock size={18} />}
                                       {cond.bloqueado ? 'HABILITAR' : 'BLOQUEAR'}
                                     </button>
+                                    <button 
+                                      onClick={() => {
+                                        abrirModalEliminar({
+                                          id: cond.id,
+                                          tipo: 'conductor',
+                                          nombre: cond.nombre || 'Conductor sin nombre',
+                                          telefono: cond.telefono || cond.celular,
+                                          motivoSugerido: cond.bloqueado 
+                                            ? 'Conductor bloqueado por spam o infracción' 
+                                            : ((cond.servicios_completados || 0) === 0 
+                                                ? 'Conductor inactivo sin viajes completados' 
+                                                : 'Depuración a criterio del administrador'),
+                                          detalles: `Placa: ${cond.vehiculo?.placa || 'N/A'} • Servicios: ${cond.servicios_completados || 0} • Saldo: $${(cond.tarjeta_virtual || 0).toLocaleString()} COP • Ciudad: ${cond.ciudad || 'N/A'}`
+                                        });
+                                      }}
+                                      className="flex-1 rounded-2xl transition-all active:scale-95 flex flex-col items-center justify-center gap-1.5 text-[10px] font-bold border border-rose-200 bg-rose-50/70 hover:bg-rose-100 text-rose-600 cursor-pointer"
+                                      title="Eliminar conductor inactivo o spam"
+                                    >
+                                      <Trash2 size={18} />
+                                      ELIMINAR
+                                    </button>
                                   </div>
 
                                   {/* Action Toggle - Document Verification / Approval */}
@@ -9202,6 +9406,30 @@ export default function App() {
                                         >
                                           <Shield size={18} className={u.rol === 'admin_suplente' ? 'text-amber-500' : 'text-slate-400'} />
                                           {u.rol === 'admin_suplente' ? 'QUITAR SUPLENTE' : 'HACER SUPLENTE'}
+                                        </button>
+                                      )}
+                                      {u.rol !== 'admin' && u.id !== user?.uid && u.email !== 'darwin.barbosa000@gmail.com' && u.email !== 'ruedasrapidasviajaseguro@gmail.com' && (
+                                        <button 
+                                          onClick={() => {
+                                            abrirModalEliminar({
+                                              id: u.id,
+                                              tipo: 'usuario',
+                                              nombre: u.nombre || 'Usuario sin nombre',
+                                              email: u.email,
+                                              telefono: u.celular || u.telefono,
+                                              motivoSugerido: u.bloqueado 
+                                                ? 'Usuario bloqueado por spam o reporte' 
+                                                : (((u.servicios_count || 0) === 0 && (u.servicios_perdidos || 0) === 0) 
+                                                    ? 'Usuario inactivo (0 viajes registrados)' 
+                                                    : 'Depuración a criterio del administrador'),
+                                              detalles: `Email: ${u.email || 'N/A'} • Viajes: ${u.servicios_count || 0} • Bono: $${(u.saldo_promo || 0).toLocaleString()} COP • Ciudad: ${u.ciudad || 'N/A'}`
+                                            });
+                                          }}
+                                          className="flex-1 rounded-2xl transition-all active:scale-95 flex flex-col items-center justify-center gap-1.5 text-[10px] font-bold border border-rose-200 bg-rose-50/70 hover:bg-rose-100 text-rose-600 cursor-pointer py-3 px-2"
+                                          title="Eliminar usuario inactivo o spam"
+                                        >
+                                          <Trash2 size={18} />
+                                          ELIMINAR
                                         </button>
                                       )}
                                     </div>
@@ -9871,7 +10099,20 @@ export default function App() {
                                                 Editar
                                               </button>
                                               <button
-                                                onClick={() => eliminarMarcaAliada(marca.id)}
+                                                onClick={() => {
+                                                  abrirModalEliminar({
+                                                    id: marca.id,
+                                                    tipo: 'aliado',
+                                                    nombre: marca.nombre || 'Comercio Aliado',
+                                                    telefono: marca.whatsapp,
+                                                    motivoSugerido: isMarcaRechazada(marca) 
+                                                      ? 'Comercio rechazado por filtros anti-spam' 
+                                                      : (!marca.whatsapp 
+                                                          ? 'Comercio sin datos de contacto' 
+                                                          : 'Depuración a criterio del administrador'),
+                                                    detalles: `Categoría: ${marca.categoria || 'N/A'} • Ciudad: ${marca.ciudad || 'N/A'} • Dirección: ${marca.direccion || 'N/A'}`
+                                                  });
+                                                }}
                                                 className="bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-100 py-1.5 px-2.5 rounded-lg text-[9.5px] font-bold transition-colors cursor-pointer"
                                                 title="Eliminar de la plataforma"
                                               >
@@ -9888,6 +10129,29 @@ export default function App() {
                             </div>
                           </div>
                         </div>
+                      )}
+
+                      {/* SUBTAB: DEPURACIÓN & CONTROL ANTI-SPAM */}
+                      {adminSubTab === 'depuracion' && (
+                        <AdminDepuracionTab
+                          allUsers={allUsers}
+                          allDrivers={allDrivers}
+                          marcasAliadas={marcasAliadas}
+                          user={user}
+                          depuracionEntityType={depuracionEntityType}
+                          setDepuracionEntityType={setDepuracionEntityType}
+                          depuracionFilter={depuracionFilter}
+                          setDepuracionFilter={setDepuracionFilter}
+                          depuracionSearchTerm={depuracionSearchTerm}
+                          setDepuracionSearchTerm={setDepuracionSearchTerm}
+                          selectedDepuracionIds={selectedDepuracionIds}
+                          setSelectedDepuracionIds={setSelectedDepuracionIds}
+                          checkUserStatus={checkUserStatus}
+                          checkDriverStatus={checkDriverStatus}
+                          checkAliadoStatus={checkAliadoStatus}
+                          abrirModalEliminar={abrirModalEliminar}
+                          abrirModalEliminarLote={abrirModalEliminarLote}
+                        />
                       )}
                     </motion.div>
                   </AnimatePresence>
@@ -13267,6 +13531,26 @@ export default function App() {
                 onClose={() => setShowChat(false)}
               />
             )}
+
+            {/* Admin Purge / Deletion Confirmation Modal */}
+            <AdminDeleteConfirmModal
+              isOpen={showDeleteConfirmModal}
+              onClose={() => {
+                if (!isDeletingEntity) {
+                  setShowDeleteConfirmModal(false);
+                  setDeleteTargetItem(null);
+                  setDeleteBatchItems([]);
+                }
+              }}
+              targetItem={deleteTargetItem}
+              batchItems={deleteBatchItems}
+              isDeleting={isDeletingEntity}
+              reasonSelection={deleteReasonSelection}
+              setReasonSelection={setDeleteReasonSelection}
+              reasonCustom={deleteReasonCustom}
+              setReasonCustom={setDeleteReasonCustom}
+              onConfirm={ejecutarEliminacionDefinitiva}
+            />
 
             {/* Admin Action Modal */}
             <AnimatePresence>
