@@ -28,3 +28,25 @@
   background: transparent !important;
   border: none !important;
 }
+
+/* Animación de flujo de ruta estilo Uber (Dash direction animation) */
+@keyframes routeDashFlow {
+  from {
+    stroke-dashoffset: 48;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.animated-route-flow {
+  stroke-dasharray: 8 16;
+  animation: routeDashFlow 1.2s linear infinite;
+}
+
+.en-camino-driver-icon,
+.en-camino-pickup-icon,
+.en-camino-dest-icon {
+  background: transparent !important;
+  border: none !important;
+}
