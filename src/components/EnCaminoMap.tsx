@@ -1,11 +1,11 @@
 import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { LocateFixed, Navigation, ShieldCheck } from 'lucide-react';
+import { LocateFixed, Navigation } from 'lucide-react';
 import { db } from '../firebase';
 import { doc, onSnapshot } from 'firebase/firestore';
 
-export interface LocationCoord {
+export interface LocationPoint {
   lat: number;
   lng: number;
   address?: string;
@@ -16,136 +16,170 @@ export interface EnCaminoMapProps {
   driverId?: string;
   driverName?: string;
   vehicleType?: string;
-  driverPos?: LocationCoord | null;
-  recogidaPos: LocationCoord;
-  destinoPos?: LocationCoord | null;
-  estado?: 'EN_CAMINO_A_RECOGIDA' | 'EN_CAMINO' | 'en_camino' | 'aceptado' | 'llegando' | 'EN_VIAJE' | 'en_transito' | string;
+  driverPos?: LocationPoint | null;
+  recogidaPos: LocationPoint;
+  destinoPos?: LocationPoint | null;
+  estado?: string; // 'EN_CAMINO_A_RECOGIDA' | 'en_camino' | 'aceptado' | 'llegando' | 'EN_VIAJE' | 'en_transito'
   onCenterClick?: () => void;
   className?: string;
   autoSimulateIfOffline?: boolean;
 }
 
-// In-memory cache for OSRM routes to guarantee rapid rendering without repeated network calls
-const osrmRouteCache = new Map<string, { coords: [number, number][]; distanceKm: number; durationMin: number }>();
-
-// Helper: Calculate bearing / heading in degrees between two coordinates
-export function calculateBearing(
-  from: { lat: number; lng: number },
-  to: { lat: number; lng: number }
-): number {
-  if (Math.abs(from.lat - to.lat) < 0.000001 && Math.abs(from.lng - to.lng) < 0.000001) {
-    return 0;
-  }
-  const dLng = ((to.lng - from.lng) * Math.PI) / 180;
-  const lat1 = (from.lat * Math.PI) / 180;
-  const lat2 = (to.lat * Math.PI) / 180;
-  const y = Math.sin(dLng) * Math.cos(lat2);
-  const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLng);
-  const brng = (Math.atan2(y, x) * 180) / Math.PI;
-  return (brng + 360) % 360;
+export function isValidPos(pos?: { lat?: number; lng?: number } | null): pos is { lat: number; lng: number } {
+  return (
+    !!pos &&
+    typeof pos.lat === 'number' &&
+    typeof pos.lng === 'number' &&
+    !isNaN(pos.lat) &&
+    !isNaN(pos.lng) &&
+    pos.lat !== 0 &&
+    pos.lng !== 0
+  );
 }
 
-// Helper: Haversine distance formula in km
 export function calculateHaversineKm(
   p1: { lat: number; lng: number },
   p2: { lat: number; lng: number }
 ): number {
   const R = 6371;
   const dLat = ((p2.lat - p1.lat) * Math.PI) / 180;
-  const dLon = ((p2.lng - p1.lng) * Math.PI) / 180;
+  const dLng = ((p2.lng - p1.lng) * Math.PI) / 180;
   const a =
     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
     Math.cos((p1.lat * Math.PI) / 180) *
       Math.cos((p2.lat * Math.PI) / 180) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
+      Math.sin(dLng / 2) *
+      Math.sin(dLng / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return Math.round(R * c * 10) / 10;
+  return Math.round(R * c * 100) / 100;
 }
 
-// Create Uber-style animated car Leaflet DivIcon with heading rotation and dynamic label
-function createDriverCarIcon(driverName: string, distanceLabel: string, headingDeg: number): L.DivIcon {
+function getVehicleEmoji(type?: string): string {
+  const t = (type || '').toLowerCase();
+  if (t.includes('moto')) return '🏍️';
+  if (t.includes('camion') || t.includes('flete') || t.includes('acarreo')) return '🚚';
+  if (t.includes('taxi')) return '🚕';
+  return '🚗';
+}
+
+// Icono Conductor para Pasajero (100% Inline CSS)
+function createPassengerDriverMarkerIcon(
+  driverName: string,
+  distanceLabel: string,
+  vehicleType?: string
+): L.DivIcon {
   const safeName = driverName || 'Darwin Barbosa';
-  const labelText = `${safeName} - ${distanceLabel}`;
+  const emoji = getVehicleEmoji(vehicleType);
 
   const html = `
-    <div class="relative flex flex-col items-center select-none pointer-events-auto" style="transform: translate(-50%, -50%);">
-      <!-- Floating Label: "Darwin Barbosa - 0.4km" -->
+    <div style="
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      transform: translate(-50%, -100%);
+      pointer-events: auto;
+      cursor: pointer;
+      user-select: none;
+      z-index: 1200;
+    ">
+      <!-- Badge Conductor -->
       <div style="
         background: #0f172a;
         color: #ffffff;
         padding: 4px 10px;
         border-radius: 9999px;
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+        border: 2px solid #38bdf8;
+        display: flex;
+        align-items: center;
+        gap: 5px;
         font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         font-size: 11px;
         font-weight: 800;
         white-space: nowrap;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
-        border: 1.5px solid #38bdf8;
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        margin-bottom: 6px;
-        transform: translateY(-2px);
+        margin-bottom: 2px;
       ">
-        <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background-color: #38bdf8; animation: ping 1.5s cubic-bezier(0,0,0.2,1) infinite;"></span>
-        <span>${labelText}</span>
+        <span style="font-size: 13px;">${emoji}</span>
+        <span>${safeName}</span>
+        <span style="
+          background: #0284c7;
+          color: #ffffff;
+          padding: 1px 6px;
+          border-radius: 6px;
+          font-size: 10px;
+          font-weight: 900;
+        ">${distanceLabel}</span>
       </div>
 
-      <!-- Rotating Vehicle Body -->
+      <!-- Flecha azul -->
       <div style="
-        width: 44px;
-        height: 44px;
-        transition: transform 0.45s cubic-bezier(0.4, 0, 0.2, 1);
-        transform: rotate(${Math.round(headingDeg)}deg);
-        filter: drop-shadow(0 6px 10px rgba(15, 23, 42, 0.4));
+        width: 0;
+        height: 0;
+        border-left: 6px solid transparent;
+        border-right: 6px solid transparent;
+        border-top: 7px solid #38bdf8;
+        margin-top: -1px;
+        filter: drop-shadow(0 2px 2px rgba(0,0,0,0.3));
+      "></div>
+
+      <!-- Radar de Pulso GPS Conductor -->
+      <div style="
+        position: relative;
+        width: 16px;
+        height: 16px;
+        margin-top: 1px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
       ">
-        <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" style="width: 100%; height: 100%;">
-          <!-- Vehicle Outer Shadow/Glow -->
-          <ellipse cx="24" cy="24" rx="14" ry="18" fill="#0284c7" fill-opacity="0.25" />
-          
-          <!-- Car Body (Top-down view) -->
-          <rect x="14" y="8" width="20" height="32" rx="8" fill="#1e293b" stroke="#f8fafc" stroke-width="2" />
-          
-          <!-- Windshield Front -->
-          <path d="M16 17C16 15 18 13 24 13C30 13 32 15 32 17L31 21H17L16 17Z" fill="#38bdf8" />
-          
-          <!-- Roof -->
-          <rect x="17" y="21" width="14" height="10" rx="2.5" fill="#0f172a" />
-          
-          <!-- Rear Window -->
-          <path d="M17 31H31L30 34C30 35 28 36 24 36C20 36 18 35 18 34L17 31Z" fill="#0284c7" />
-          
-          <!-- Headlights -->
-          <rect x="15" y="8" width="4" height="2" rx="1" fill="#fef08a" />
-          <rect x="29" y="8" width="4" height="2" rx="1" fill="#fef08a" />
-          
-          <!-- Taillights -->
-          <rect x="15" y="38" width="4" height="1.5" rx="0.75" fill="#ef4444" />
-          <rect x="29" y="38" width="4" height="1.5" rx="0.75" fill="#ef4444" />
-          
-          <!-- Center Hood Accent -->
-          <line x1="24" y1="9" x2="24" y2="12" stroke="#38bdf8" stroke-width="1.5" stroke-linecap="round" />
-        </svg>
+        <div style="
+          position: absolute;
+          width: 100%;
+          height: 100%;
+          background-color: #38bdf8;
+          border-radius: 50%;
+          opacity: 0.75;
+          animation: ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;
+        "></div>
+        <div style="
+          width: 10px;
+          height: 10px;
+          background-color: #0284c7;
+          border: 2px solid #ffffff;
+          border-radius: 50%;
+          box-shadow: 0 0 6px rgba(0,0,0,0.4);
+        "></div>
       </div>
     </div>
   `;
 
   return L.divIcon({
     html,
-    className: 'en-camino-driver-icon',
-    iconSize: [160, 80],
-    iconAnchor: [80, 52],
+    className: 'custom-driver-marker-wrapper',
+    iconSize: [0, 0],
+    iconAnchor: [0, 0],
   });
 }
 
-// Create Pulsing Green Pickup Pin Leaflet DivIcon: "Recogida: Universidad"
-function createPickupPulsingIcon(pickupName: string): L.DivIcon {
+// Icono Punto de Recogida Pulsante (100% Inline CSS)
+function createPassengerPickupMarkerIcon(pickupName: string): L.DivIcon {
   const safePickup = pickupName || 'Universidad';
-  const labelText = `Recogida: ${safePickup}`;
 
   const html = `
-    <div class="relative flex flex-col items-center select-none pointer-events-none" style="transform: translate(-50%, -100%);">
+    <div style="
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      transform: translate(-50%, -100%);
+      pointer-events: auto;
+      cursor: pointer;
+      user-select: none;
+      z-index: 1100;
+    ">
       <!-- Floating Label: "Recogida: Universidad" -->
       <div style="
         background: #064e3b;
@@ -156,46 +190,54 @@ function createPickupPulsingIcon(pickupName: string): L.DivIcon {
         font-size: 11px;
         font-weight: 800;
         white-space: nowrap;
-        box-shadow: 0 4px 14px rgba(5, 150, 105, 0.4);
-        border: 1.5px solid #34d399;
+        box-shadow: 0 4px 14px rgba(5, 150, 105, 0.45);
+        border: 2px solid #34d399;
         display: flex;
         align-items: center;
         gap: 5px;
-        margin-bottom: 4px;
+        margin-bottom: 2px;
       ">
         <span style="font-size: 11px;">📍</span>
-        <span>${labelText}</span>
+        <span>Recogida: ${safePickup}</span>
       </div>
 
+      <!-- Flecha Verde -->
+      <div style="
+        width: 0;
+        height: 0;
+        border-left: 6px solid transparent;
+        border-right: 6px solid transparent;
+        border-top: 7px solid #10b981;
+        margin-top: -1px;
+        filter: drop-shadow(0 2px 2px rgba(0,0,0,0.3));
+      "></div>
+
       <!-- Pulsing Beacon Pin -->
-      <div class="relative flex items-center justify-center" style="width: 32px; height: 32px;">
-        <!-- Pulsing radar wave -->
-        <span style="
-          position: absolute;
-          width: 32px;
-          height: 32px;
-          border-radius: 50%;
-          background-color: rgba(16, 185, 129, 0.35);
-          animation: ping 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
-        "></span>
-
-        <!-- Secondary ring -->
-        <span style="
-          position: absolute;
-          width: 24px;
-          height: 24px;
-          border-radius: 50%;
-          border: 2px solid rgba(16, 185, 129, 0.6);
-        "></span>
-
-        <!-- Solid central pin dot -->
+      <div style="
+        position: relative;
+        width: 16px;
+        height: 16px;
+        margin-top: 1px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      ">
         <div style="
-          width: 14px;
-          height: 14px;
+          position: absolute;
+          width: 100%;
+          height: 100%;
           border-radius: 50%;
-          background: #10b981;
-          border: 2.5px solid #ffffff;
-          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+          background-color: #10b981;
+          opacity: 0.75;
+          animation: ping 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
+        "></div>
+        <div style="
+          width: 10px;
+          height: 10px;
+          border-radius: 50%;
+          background: #059669;
+          border: 2px solid #ffffff;
+          box-shadow: 0 0 6px rgba(0, 0, 0, 0.4);
         "></div>
       </div>
     </div>
@@ -203,11 +245,102 @@ function createPickupPulsingIcon(pickupName: string): L.DivIcon {
 
   return L.divIcon({
     html,
-    className: 'en-camino-pickup-icon',
-    iconSize: [180, 70],
-    iconAnchor: [90, 70],
+    className: 'custom-pickup-marker-wrapper',
+    iconSize: [0, 0],
+    iconAnchor: [0, 0],
   });
 }
+
+// Icono Destino Final (Solo en viaje)
+function createPassengerDestinationMarkerIcon(destName: string): L.DivIcon {
+  const safeDest = destName || 'Destino';
+
+  const html = `
+    <div style="
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      transform: translate(-50%, -100%);
+      pointer-events: auto;
+      cursor: pointer;
+      user-select: none;
+      z-index: 1100;
+    ">
+      <!-- Badge Destino -->
+      <div style="
+        background: #881337;
+        color: #ffffff;
+        padding: 4px 10px;
+        border-radius: 9999px;
+        box-shadow: 0 4px 14px rgba(225, 29, 72, 0.45);
+        border: 2px solid #fb7185;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        font-size: 11px;
+        font-weight: 800;
+        white-space: nowrap;
+        margin-bottom: 2px;
+      ">
+        <span style="font-size: 11px;">🏁</span>
+        <span>Destino: ${safeDest}</span>
+      </div>
+
+      <!-- Flecha Roja -->
+      <div style="
+        width: 0;
+        height: 0;
+        border-left: 6px solid transparent;
+        border-right: 6px solid transparent;
+        border-top: 7px solid #e11d48;
+        margin-top: -1px;
+        filter: drop-shadow(0 2px 2px rgba(0,0,0,0.3));
+      "></div>
+
+      <!-- Pulsing Pin Rojo -->
+      <div style="
+        position: relative;
+        width: 16px;
+        height: 16px;
+        margin-top: 1px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      ">
+        <div style="
+          position: absolute;
+          width: 100%;
+          height: 100%;
+          border-radius: 50%;
+          background-color: #f43f5e;
+          opacity: 0.75;
+          animation: ping 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
+        "></div>
+        <div style="
+          width: 10px;
+          height: 10px;
+          border-radius: 50%;
+          background: #be123c;
+          border: 2px solid #ffffff;
+          box-shadow: 0 0 6px rgba(0, 0, 0, 0.4);
+        "></div>
+      </div>
+    </div>
+  `;
+
+  return L.divIcon({
+    html,
+    className: 'custom-dest-marker-wrapper',
+    iconSize: [0, 0],
+    iconAnchor: [0, 0],
+  });
+}
+
+// In-memory route cache
+const passengerRouteCache = new Map<string, { coords: [number, number][]; distanceKm: number; durationMin: number }>();
 
 export const EnCaminoMap: React.FC<EnCaminoMapProps> = ({
   driverId,
@@ -218,207 +351,127 @@ export const EnCaminoMap: React.FC<EnCaminoMapProps> = ({
   destinoPos = null,
   estado = 'EN_CAMINO_A_RECOGIDA',
   onCenterClick,
-  className = 'w-full h-full min-h-[380px]',
+  className = 'h-[400px]',
   autoSimulateIfOffline = true,
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
+  const markersLayerRef = useRef<L.LayerGroup | null>(null);
+  const routeLayerRef = useRef<L.LayerGroup | null>(null);
+  const activeBoundsPointsRef = useRef<[number, number][]>([]);
 
-  // Markers & Polyline references
-  const driverMarkerRef = useRef<L.Marker | null>(null);
-  const pickupMarkerRef = useRef<L.Marker | null>(null);
-  const destinoMarkerRef = useRef<L.Marker | null>(null);
-  const routeCasingRef = useRef<L.Polyline | null>(null);
-  const routeSolidRef = useRef<L.Polyline | null>(null);
-  const routeDashRef = useRef<L.Polyline | null>(null);
+  // ESTADO DE SEGUIMIENTO (Permite exploración libre sin mapa "amarrado")
+  const [isFollowing, setIsFollowing] = useState<boolean>(true);
 
-  // Live Driver Location state
-  const [driverLocation, setDriverLocation] = useState<{ lat: number; lng: number } | null>(() => {
-    if (initialDriverPos && !isNaN(initialDriverPos.lat) && !isNaN(initialDriverPos.lng)) {
+  // Normalizar el estado
+  const normalizedEstado = (estado || 'EN_CAMINO_A_RECOGIDA').toLowerCase();
+  const isEnViaje =
+    normalizedEstado === 'en_viaje' ||
+    normalizedEstado === 'en_transito' ||
+    normalizedEstado === 'finalizado';
+  const isEnCamino = !isEnViaje;
+
+  // Ubicación del conductor con fallback robusto inicial
+  const [driverLocation, setDriverLocation] = useState<{ lat: number; lng: number }>(() => {
+    if (isValidPos(initialDriverPos)) {
       return { lat: initialDriverPos.lat, lng: initialDriverPos.lng };
     }
-    // Fallback: 1.3 km offset from pickup if not yet loaded
-    return {
-      lat: recogidaPos.lat + 0.008,
-      lng: recogidaPos.lng - 0.007,
-    };
+    // Inicializar aproximándose a recogida (~500m de distancia)
+    if (isValidPos(recogidaPos)) {
+      return { lat: recogidaPos.lat + 0.004, lng: recogidaPos.lng - 0.003 };
+    }
+    return { lat: 4.3364, lng: -74.3638 };
   });
 
-  const prevDriverLocationRef = useRef<{ lat: number; lng: number } | null>(driverLocation);
-  const [heading, setHeading] = useState<number>(45);
+  // Suscribirse al padre si cambia driverPos
+  useEffect(() => {
+    if (isValidPos(initialDriverPos)) {
+      setDriverLocation({ lat: initialDriverPos.lat, lng: initialDriverPos.lng });
+    }
+  }, [initialDriverPos?.lat, initialDriverPos?.lng]);
 
-  // Real route metrics calculated via OSRM
+  // Target según estado:
+  // Si está en camino, el objetivo es recogidaPos
+  // Si está en viaje, el objetivo es destinoPos
+  const targetDestination = useMemo(() => {
+    if (isEnViaje && isValidPos(destinoPos)) {
+      return destinoPos;
+    }
+    return recogidaPos;
+  }, [isEnViaje, destinoPos, recogidaPos]);
+
+  // Info de ruta calculada
   const [routeInfo, setRouteInfo] = useState<{
     coords: [number, number][];
     distanceKm: number;
     durationMin: number;
   }>({
     coords: [],
-    distanceKm: 1.3,
-    durationMin: 2,
+    distanceKm: 0.4,
+    durationMin: 1,
   });
 
-  // State normalization
-  const normalizedEstado = (estado || 'EN_CAMINO_A_RECOGIDA').toUpperCase();
-  const isEnCamino =
-    normalizedEstado === 'EN_CAMINO' ||
-    normalizedEstado === 'EN_CAMINO_A_RECOGIDA' ||
-    normalizedEstado === 'ACEPTADO' ||
-    normalizedEstado === 'LLEGANDO';
-  const isEnViaje = normalizedEstado === 'EN_VIAJE' || normalizedEstado === 'EN_TRANSITO';
-
-  // 1. REQUERIMIENTO 1: SUSCRIPCIÓN A LA UBICACIÓN DEL CONDUCTOR (cada 3 segundos vía WebSocket / Firestore / Simulator)
+  // Suscripción a Firestore 'drivers_location'
   useEffect(() => {
-    let ws: WebSocket | null = null;
-    let unsubscribeFirestore: (() => void) | null = null;
-    let fallbackInterval: any = null;
+    if (!driverId) return;
 
-    // A. Intentar WebSocket si el entorno lo provee
-    if (typeof window !== 'undefined' && driverId) {
-      try {
-        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const wsUrl = `${protocol}//${window.location.host}/api/ws/driver/${driverId}`;
-        ws = new WebSocket(wsUrl);
-
-        ws.onmessage = (event) => {
-          try {
-            const data = JSON.parse(event.data);
-            if (data && typeof data.lat === 'number' && typeof data.lng === 'number') {
-              setDriverLocation((prev) => {
-                if (prev) {
-                  const newHeading = calculateBearing(prev, { lat: data.lat, lng: data.lng });
-                  if (newHeading !== 0) setHeading(newHeading);
-                  prevDriverLocationRef.current = prev;
-                }
-                return { lat: data.lat, lng: data.lng };
-              });
+    try {
+      const docRef = doc(db, 'drivers_location', driverId);
+      const unsubscribe = onSnapshot(
+        docRef,
+        (snapshot) => {
+          if (snapshot.exists()) {
+            const data = snapshot.data();
+            if (isValidPos({ lat: data.lat, lng: data.lng })) {
+              setDriverLocation({ lat: data.lat, lng: data.lng });
             }
-          } catch {
-            // Safe ignore ws malformed packets
           }
-        };
-
-        ws.onerror = () => {
-          // Fallback silently to Firestore
-        };
-      } catch {
-        // Fallback silently
-      }
-    }
-
-    // B. Suscripción en tiempo real a Firestore doc 'drivers_location'
-    if (driverId) {
-      try {
-        const docRef = doc(db, 'drivers_location', driverId);
-        unsubscribeFirestore = onSnapshot(
-          docRef,
-          (snapshot) => {
-            if (snapshot.exists()) {
-              const data = snapshot.data();
-              if (typeof data.lat === 'number' && typeof data.lng === 'number' && !isNaN(data.lat)) {
-                setDriverLocation((prev) => {
-                  if (prev) {
-                    const newHeading = calculateBearing(prev, { lat: data.lat, lng: data.lng });
-                    if (newHeading !== 0) setHeading(newHeading);
-                    prevDriverLocationRef.current = prev;
-                  }
-                  return { lat: data.lat, lng: data.lng };
-                });
-              }
-            }
-          },
-          (err) => {
-            console.warn('Notice listening to driver location via Firestore:', err);
-          }
-        );
-      } catch (err) {
-        console.warn('Firestore subscription notice:', err);
-      }
-    }
-
-    // C. Si no hay señal activa o para pruebas/demostración, actualización suave cada 3 segundos
-    if (autoSimulateIfOffline) {
-      let stepIndex = 0;
-      fallbackInterval = setInterval(() => {
-        setDriverLocation((curr) => {
-          if (!curr) return { lat: recogidaPos.lat + 0.009, lng: recogidaPos.lng - 0.007 };
-
-          // Calcular vector hacia el objetivo (recogida si está en camino, destino si está en viaje)
-          const target = isEnViaje && destinoPos ? destinoPos : recogidaPos;
-          const dLat = target.lat - curr.lat;
-          const dLng = target.lng - curr.lng;
-          const dist = Math.sqrt(dLat * dLat + dLng * dLng);
-
-          // Si ya está muy cerca (< 20 metros), mantener en posición con leve deriva
-          if (dist < 0.0003) {
-            return curr;
-          }
-
-          // Mover un paso cada 3 segundos a velocidad realista de conducción (~30 km/h)
-          const stepRatio = Math.min(0.08, 0.00035 / (dist || 0.001));
-          const nextLat = curr.lat + dLat * stepRatio;
-          const nextLng = curr.lng + dLng * stepRatio;
-
-          const newBearing = calculateBearing(curr, { lat: nextLat, lng: nextLng });
-          if (newBearing !== 0) {
-            setHeading(newBearing);
-          }
-          prevDriverLocationRef.current = curr;
-          stepIndex++;
-
-          return { lat: nextLat, lng: nextLng };
-        });
-      }, 3000);
-    }
-
-    return () => {
-      if (ws) {
-        try {
-          ws.close();
-        } catch {}
-      }
-      if (unsubscribeFirestore) {
-        unsubscribeFirestore();
-      }
-      if (fallbackInterval) {
-        clearInterval(fallbackInterval);
-      }
-    };
-  }, [driverId, autoSimulateIfOffline, isEnViaje, destinoPos, recogidaPos]);
-
-  // Si llega initialDriverPos externo explícito y es válido, sincronizar
-  useEffect(() => {
-    if (initialDriverPos && typeof initialDriverPos.lat === 'number' && !isNaN(initialDriverPos.lat)) {
-      setDriverLocation((prev) => {
-        if (prev) {
-          const newBearing = calculateBearing(prev, initialDriverPos);
-          if (newBearing !== 0) setHeading(newBearing);
-          prevDriverLocationRef.current = prev;
+        },
+        (err) => {
+          console.warn('Notice listening to driver location via Firestore:', err);
         }
-        return { lat: initialDriverPos.lat, lng: initialDriverPos.lng };
-      });
+      );
+      return () => unsubscribe();
+    } catch (err) {
+      console.warn('Firestore subscription notice:', err);
     }
-  }, [initialDriverPos?.lat, initialDriverPos?.lng]);
+  }, [driverId]);
 
-  // 2. CÁLCULO DE RUTA CON OSRM Y useMemo
-  // Define punto objetivo: en EN_CAMINO es ESTRICTAMENTE recogidaPos. Solo en EN_VIAJE es destinoPos.
-  const targetDestination = useMemo(() => {
-    if (isEnViaje && destinoPos && !isNaN(destinoPos.lat) && !isNaN(destinoPos.lng)) {
-      return destinoPos;
-    }
-    return recogidaPos;
-  }, [isEnViaje, destinoPos, recogidaPos]);
-
-  // Memoized fetcher para OSRM
+  // Simulación de aproximación suave si no hay señal activa
   useEffect(() => {
-    if (!driverLocation || !targetDestination) return;
+    if (!autoSimulateIfOffline) return;
+
+    const interval = setInterval(() => {
+      setDriverLocation((curr) => {
+        if (!curr || !targetDestination) return curr;
+
+        const dLat = targetDestination.lat - curr.lat;
+        const dLng = targetDestination.lng - curr.lng;
+        const dist = Math.sqrt(dLat * dLat + dLng * dLng);
+
+        // Si está a menos de 15m, mantener posición
+        if (dist < 0.0002) return curr;
+
+        const stepRatio = Math.min(0.04, 0.0002 / (dist || 0.001));
+        return {
+          lat: curr.lat + dLat * stepRatio,
+          lng: curr.lng + dLng * stepRatio,
+        };
+      });
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [autoSimulateIfOffline, targetDestination]);
+
+  // Fetch OSRM Route
+  useEffect(() => {
+    if (!isValidPos(driverLocation) || !targetDestination || !isValidPos(targetDestination)) return;
 
     let isMounted = true;
     const cacheKey = `${driverLocation.lat.toFixed(4)},${driverLocation.lng.toFixed(4)}->${targetDestination.lat.toFixed(4)},${targetDestination.lng.toFixed(4)}`;
 
-    if (osrmRouteCache.has(cacheKey)) {
-      const cached = osrmRouteCache.get(cacheKey)!;
-      setRouteInfo(cached);
+    if (passengerRouteCache.has(cacheKey)) {
+      setRouteInfo(passengerRouteCache.get(cacheKey)!);
       return;
     }
 
@@ -440,21 +493,20 @@ export const EnCaminoMap: React.FC<EnCaminoMapProps> = ({
             const durationMin = Math.max(1, Math.round(route.duration / 60));
 
             const result = { coords, distanceKm, durationMin };
-            osrmRouteCache.set(cacheKey, result);
+            passengerRouteCache.set(cacheKey, result);
             setRouteInfo(result);
             return;
           }
         }
       } catch {
-        // Fallback a cálculo matemático si OSRM está temporalmente saturado
+        // Fallback
       }
 
       if (isMounted) {
         const directKm = calculateHaversineKm(driverLocation, targetDestination);
         const roadKm = Math.round(directKm * 1.25 * 10) / 10;
-        const estMin = Math.max(1, Math.round((roadKm / 26) * 60));
+        const estMin = Math.max(1, Math.round((roadKm / 28) * 60));
 
-        // Interpolar línea recta suave de 8 puntos
         const steps = 8;
         const fallbackCoords: [number, number][] = [];
         for (let i = 0; i <= steps; i++) {
@@ -470,7 +522,7 @@ export const EnCaminoMap: React.FC<EnCaminoMapProps> = ({
           distanceKm: roadKm || 0.4,
           durationMin: estMin || 2,
         };
-        osrmRouteCache.set(cacheKey, fallbackResult);
+        passengerRouteCache.set(cacheKey, fallbackResult);
         setRouteInfo(fallbackResult);
       }
     };
@@ -480,43 +532,54 @@ export const EnCaminoMap: React.FC<EnCaminoMapProps> = ({
     return () => {
       isMounted = false;
     };
-  }, [driverLocation?.lat, driverLocation?.lng, targetDestination?.lat, targetDestination?.lng]);
+  }, [driverLocation.lat, driverLocation.lng, targetDestination]);
 
-  // Formatear distancia para el label del conductor: ej. "0.4km"
-  const formattedDistanceLabel = useMemo(() => {
-    return `${routeInfo.distanceKm}km`;
-  }, [routeInfo.distanceKm]);
-
-  // Formatear dirección / nombre de recogida: ej. "Recogida: Universidad"
-  const pickupLabel = useMemo(() => {
-    return recogidaPos.name || recogidaPos.address || 'Universidad';
-  }, [recogidaPos.name, recogidaPos.address]);
-
-  // 3. INICIALIZACIÓN DEL MAPA LEAFLET (Modo Mapa Claro, sin satelital, sin controles invasivos)
+  // Inicializar Leaflet 100% Interactivo y LayerGroups
   useEffect(() => {
     if (!containerRef.current) return;
 
     if (!mapRef.current) {
       try {
-        const startLat = driverLocation?.lat || recogidaPos.lat;
-        const startLng = driverLocation?.lng || recogidaPos.lng;
+        const centerLat = isValidPos(recogidaPos) ? recogidaPos.lat : 4.3364;
+        const centerLng = isValidPos(recogidaPos) ? recogidaPos.lng : -74.3638;
 
+        // Leaflet 100% interactivo: drag, scroll, touch, zoom
         const map = L.map(containerRef.current, {
-          center: [startLat, startLng],
+          center: [centerLat, centerLng],
           zoom: 15,
-          zoomControl: false, // Sin botones flotantes que tapen el mapa
+          zoomControl: false,
           attributionControl: false,
+          dragging: true,
+          scrollWheelZoom: true,
+          doubleClickZoom: true,
+          touchZoom: true,
+          keyboard: true,
         });
 
-        // Capa de mapa claro de alto contraste (CartoDB Positron / OSM Light)
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+        // Detectar interacción del usuario para pausar el seguimiento automático
+        map.on('dragstart', () => {
+          setIsFollowing(false);
+        });
+        map.on('zoomstart', () => {
+          setIsFollowing(false);
+        });
+
+        // Capa OpenStreetMap 100% puro gratis
+        const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '&copy; OpenStreetMap',
           maxZoom: 19,
-          subdomains: 'abcd',
-        }).addTo(map);
+        });
+        osmLayer.addTo(map);
+
+        // LayerGroups dedicados
+        const markersGroup = L.layerGroup().addTo(map);
+        markersLayerRef.current = markersGroup;
+
+        const routesGroup = L.layerGroup().addTo(map);
+        routeLayerRef.current = routesGroup;
 
         mapRef.current = map;
 
-        // Invalidate size con delay para adaptarse al modal o contenedor
         setTimeout(() => {
           if (mapRef.current) mapRef.current.invalidateSize();
         }, 150);
@@ -528,163 +591,195 @@ export const EnCaminoMap: React.FC<EnCaminoMapProps> = ({
       }
     }
 
+    let resizeObserver: ResizeObserver | null = null;
+    if (containerRef.current && typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver(() => {
+        if (mapRef.current) {
+          mapRef.current.invalidateSize();
+        }
+      });
+      resizeObserver.observe(containerRef.current);
+    }
+
     return () => {
+      if (resizeObserver) {
+        resizeObserver.disconnect();
+      }
       if (mapRef.current) {
         try {
           mapRef.current.remove();
         } catch {}
         mapRef.current = null;
+        markersLayerRef.current = null;
+        routeLayerRef.current = null;
       }
     };
   }, []);
 
-  // 4. ACTUALIZAR MARCADORES Y RUTA SEGÚN EL ESTADO
+  const pickupLabel = useMemo(() => {
+    return recogidaPos?.name || recogidaPos?.address?.split(',')[0] || 'Universidad';
+  }, [recogidaPos?.name, recogidaPos?.address]);
+
+  const destLabel = useMemo(() => {
+    return destinoPos?.name || destinoPos?.address?.split(',')[0] || 'Destino Final';
+  }, [destinoPos?.name, destinoPos?.address]);
+
+  const formattedDistanceLabel = useMemo(() => {
+    return `${routeInfo.distanceKm}km`;
+  }, [routeInfo.distanceKm]);
+
+  // SINCRONIZACIÓN DE MARCADORES Y RUTA (Respeta `isFollowing`)
   useEffect(() => {
     const map = mapRef.current;
-    if (!map) return;
+    const markersGroup = markersLayerRef.current;
+    const routesGroup = routeLayerRef.current;
 
-    // A. MARCADOR DE RECOGIDA: Pin verde pulsante, label "Recogida: Universidad", NO arrastrable
-    if (!pickupMarkerRef.current) {
-      pickupMarkerRef.current = L.marker([recogidaPos.lat, recogidaPos.lng], {
-        icon: createPickupPulsingIcon(pickupLabel),
-        draggable: false,
-        zIndexOffset: 800,
-      }).addTo(map);
-    } else {
-      pickupMarkerRef.current.setLatLng([recogidaPos.lat, recogidaPos.lng]);
-      pickupMarkerRef.current.setIcon(createPickupPulsingIcon(pickupLabel));
-    }
+    if (!map || !markersGroup || !routesGroup) return;
 
-    // B. MARCADOR DEL CONDUCTOR: Icono de carro con rotación de heading y label "Darwin Barbosa - 0.4km"
-    if (driverLocation && !isNaN(driverLocation.lat) && !isNaN(driverLocation.lng)) {
-      if (!driverMarkerRef.current) {
-        driverMarkerRef.current = L.marker([driverLocation.lat, driverLocation.lng], {
-          icon: createDriverCarIcon(driverName, formattedDistanceLabel, heading),
-          draggable: false,
-          zIndexOffset: 1200,
-        }).addTo(map);
-      } else {
-        driverMarkerRef.current.setLatLng([driverLocation.lat, driverLocation.lng]);
-        driverMarkerRef.current.setIcon(createDriverCarIcon(driverName, formattedDistanceLabel, heading));
+    // Limpiar capas previas
+    markersGroup.clearLayers();
+    routesGroup.clearLayers();
+
+    const activeBoundsPoints: [number, number][] = [];
+
+    // Calcular desplazamiento visual si conductor y recogida están exactamente en el mismo punto
+    let driverDrawLat = driverLocation.lat;
+    let driverDrawLng = driverLocation.lng;
+
+    if (isEnCamino && isValidPos(recogidaPos) && isValidPos(driverLocation)) {
+      const distDirect = calculateHaversineKm(driverLocation, recogidaPos);
+      if (distDirect < 0.03) {
+        driverDrawLat += 0.00018;
+        driverDrawLng += 0.00018;
       }
     }
 
-    // C. REQUERIMIENTO ESTRICTO: NUNCA mostrar el marcador de Destino ni la ruta hacia el destino cuando estado == EN_CAMINO
+    // 1. MARCADOR DEL CONDUCTOR
+    if (isValidPos({ lat: driverDrawLat, lng: driverDrawLng })) {
+      const driverIcon = createPassengerDriverMarkerIcon(driverName, formattedDistanceLabel, vehicleType);
+      const marker = L.marker([driverDrawLat, driverDrawLng], {
+        icon: driverIcon,
+        zIndexOffset: 1200,
+        interactive: true,
+      });
+      marker.addTo(markersGroup);
+      activeBoundsPoints.push([driverDrawLat, driverDrawLng]);
+    }
+
+    // 2. REGLA ESTRICTA DE ESTADOS:
     if (isEnCamino) {
-      // Ocultar marcador de destino
-      if (destinoMarkerRef.current) {
-        map.removeLayer(destinoMarkerRef.current);
-        destinoMarkerRef.current = null;
-      }
-    } else if (isEnViaje && destinoPos && !isNaN(destinoPos.lat) && !isNaN(destinoPos.lng)) {
-      // Solo mostrar marcador de destino en estado EN_VIAJE
-      if (!destinoMarkerRef.current) {
-        const destIcon = L.divIcon({
-          html: `
-            <div class="flex flex-col items-center select-none pointer-events-none" style="transform: translate(-50%, -100%);">
-              <div style="background: #991b1b; color: white; padding: 4px 9px; border-radius: 9999px; font-size: 11px; font-weight: 800; border: 1.5px solid #f87171; box-shadow: 0 4px 10px rgba(0,0,0,0.3); margin-bottom: 2px;">
-                🏁 Destino: ${destinoPos.name || destinoPos.address || 'Final'}
-              </div>
-              <div style="width: 14px; height: 14px; border-radius: 50%; background: #dc2626; border: 3px solid #ffffff; box-shadow: 0 2px 6px rgba(0,0,0,0.4);"></div>
-            </div>
-          `,
-          className: 'en-camino-dest-icon',
-          iconSize: [160, 60],
-          iconAnchor: [80, 60],
+      // ESTADO EN CAMINO A RECOGIDA:
+      // SOLO MOSTRAR 2 MARCADORES: Conductor y Punto de Recogida
+      // NUNCA mostrar el marcador de destino en este estado
+      if (isValidPos(recogidaPos)) {
+        const pickupIcon = createPassengerPickupMarkerIcon(pickupLabel);
+        const marker = L.marker([recogidaPos.lat, recogidaPos.lng], {
+          icon: pickupIcon,
+          zIndexOffset: 900,
+          interactive: true,
         });
-
-        destinoMarkerRef.current = L.marker([destinoPos.lat, destinoPos.lng], {
+        marker.addTo(markersGroup);
+        activeBoundsPoints.push([recogidaPos.lat, recogidaPos.lng]);
+      }
+    } else {
+      // ESTADO EN VIAJE / TRANSITO:
+      // Mostrar destino final
+      if (isValidPos(destinoPos)) {
+        const destIcon = createPassengerDestinationMarkerIcon(destLabel);
+        const marker = L.marker([destinoPos.lat, destinoPos.lng], {
           icon: destIcon,
-          draggable: false,
-        }).addTo(map);
-      } else {
-        destinoMarkerRef.current.setLatLng([destinoPos.lat, destinoPos.lng]);
+          zIndexOffset: 950,
+          interactive: true,
+        });
+        marker.addTo(markersGroup);
+        activeBoundsPoints.push([destinoPos.lat, destinoPos.lng]);
       }
     }
 
-    // D. REQUERIMIENTO 4: TRAZAR RUTA (Línea azul sólida de 5px, con borde blanco y animación dash)
-    const pointsToDraw = routeInfo.coords.length >= 2 
-      ? routeInfo.coords 
-      : driverLocation 
-      ? [[driverLocation.lat, driverLocation.lng], [targetDestination.lat, targetDestination.lng]] as [number, number][]
-      : [];
+    // Guardar puntos activos en ref para centrado
+    activeBoundsPointsRef.current = activeBoundsPoints;
+
+    // 3. TRAZADO DE RUTA
+    const pointsToDraw =
+      routeInfo.coords.length >= 2
+        ? routeInfo.coords
+        : isValidPos(driverLocation) && isValidPos(targetDestination)
+        ? ([[driverLocation.lat, driverLocation.lng], [targetDestination.lat, targetDestination.lng]] as [number, number][])
+        : [];
 
     if (pointsToDraw.length >= 2) {
-      // Capa 1: Borde blanco (Casing)
-      if (!routeCasingRef.current) {
-        routeCasingRef.current = L.polyline(pointsToDraw, {
-          color: '#ffffff',
-          weight: 9,
-          opacity: 0.95,
-          lineCap: 'round',
-          lineJoin: 'round',
-        }).addTo(map);
-      } else {
-        routeCasingRef.current.setLatLngs(pointsToDraw);
-      }
+      // Casing blanco exterior
+      L.polyline(pointsToDraw, {
+        color: '#ffffff',
+        weight: 9,
+        opacity: 0.95,
+        lineCap: 'round',
+        lineJoin: 'round',
+      }).addTo(routesGroup);
 
-      // Capa 2: Línea azul sólida de 5px
-      if (!routeSolidRef.current) {
-        routeSolidRef.current = L.polyline(pointsToDraw, {
-          color: '#2563eb', // Azul sólido
-          weight: 5,
-          opacity: 1,
-          lineCap: 'round',
-          lineJoin: 'round',
-        }).addTo(map);
-      } else {
-        routeSolidRef.current.setLatLngs(pointsToDraw);
-      }
+      // Línea azul sólida de 5px
+      L.polyline(pointsToDraw, {
+        color: '#2563eb',
+        weight: 5,
+        opacity: 1,
+        lineCap: 'round',
+        lineJoin: 'round',
+      }).addTo(routesGroup);
 
-      // Capa 3: Animación de dash para indicar dirección
-      if (!routeDashRef.current) {
-        routeDashRef.current = L.polyline(pointsToDraw, {
-          color: '#93c5fd', // Azul celeste luminoso
-          weight: 3,
-          opacity: 0.9,
-          dashArray: '8, 16',
-          className: 'animated-route-flow',
-        }).addTo(map);
-      } else {
-        routeDashRef.current.setLatLngs(pointsToDraw);
-      }
+      // Animación de dash
+      L.polyline(pointsToDraw, {
+        color: '#93c5fd',
+        weight: 3,
+        opacity: 0.9,
+        dashArray: '8, 16',
+        className: 'animated-route-flow',
+      }).addTo(routesGroup);
+    }
 
-      // E. REQUERIMIENTO 3: AUTO-FIT BOUNDS con padding: 80
-      try {
-        const boundsPoints: [number, number][] = [];
-        if (driverLocation) boundsPoints.push([driverLocation.lat, driverLocation.lng]);
-        boundsPoints.push([recogidaPos.lat, recogidaPos.lng]);
+    // 4. AUTO-FIT BOUNDS CONTROLADO: SOLO cuando isFollowing === true
+    if (isFollowing) {
+      if (activeBoundsPoints.length >= 2) {
+        const p1 = activeBoundsPoints[0];
+        const p2 = activeBoundsPoints[1];
+        const dist = calculateHaversineKm({ lat: p1[0], lng: p1[1] }, { lat: p2[0], lng: p2[1] });
 
-        const bounds = L.latLngBounds(boundsPoints);
-        if (bounds.isValid()) {
-          map.fitBounds(bounds, {
-            padding: [80, 80],
-            maxZoom: 17,
-            animate: true,
-          });
+        if (dist > 0.03) {
+          try {
+            const bounds = L.latLngBounds(activeBoundsPoints);
+            if (bounds.isValid()) {
+              map.fitBounds(bounds, { padding: [60, 60], maxZoom: 16, animate: false });
+            }
+          } catch (e) {
+            console.warn('fitBounds notice:', e);
+          }
+        } else {
+          map.setView([p1[0], p1[1]], 16);
         }
-      } catch (e) {
-        console.warn('fitBounds notice:', e);
+      } else if (activeBoundsPoints.length === 1) {
+        map.setView(activeBoundsPoints[0], 16);
       }
     }
   }, [
-    driverLocation?.lat,
-    driverLocation?.lng,
-    heading,
+    driverLocation.lat,
+    driverLocation.lng,
     driverName,
     formattedDistanceLabel,
+    vehicleType,
+    isEnCamino,
     recogidaPos.lat,
     recogidaPos.lng,
     pickupLabel,
-    isEnCamino,
-    isEnViaje,
-    destinoPos,
+    destinoPos?.lat,
+    destinoPos?.lng,
+    destLabel,
     targetDestination,
     routeInfo.coords,
+    isFollowing,
   ]);
 
-  // Botón ÚNICO de centrar en mi ubicación abajo a la derecha
+  // Centrar en ubicación activa y reactivar seguimiento continuo
   const handleCenterOnLocation = useCallback(() => {
+    setIsFollowing(true);
     const map = mapRef.current;
     if (!map) return;
 
@@ -692,36 +787,83 @@ export const EnCaminoMap: React.FC<EnCaminoMapProps> = ({
       onCenterClick();
     }
 
-    if (driverLocation && recogidaPos) {
+    const pts = activeBoundsPointsRef.current;
+    if (pts.length >= 2) {
+      const dist = calculateHaversineKm({ lat: pts[0][0], lng: pts[0][1] }, { lat: pts[1][0], lng: pts[1][1] });
+      if (dist > 0.03) {
+        const bounds = L.latLngBounds(pts);
+        map.fitBounds(bounds, { padding: [60, 60], maxZoom: 16, animate: true });
+      } else {
+        map.setView([pts[0][0], pts[0][1]], 16, { animate: true });
+      }
+    } else if (pts.length === 1) {
+      map.setView([pts[0][0], pts[0][1]], 16, { animate: true });
+    } else if (isValidPos(driverLocation) && isValidPos(recogidaPos)) {
       const bounds = L.latLngBounds([
         [driverLocation.lat, driverLocation.lng],
         [recogidaPos.lat, recogidaPos.lng],
       ]);
-      map.fitBounds(bounds, { padding: [80, 80], maxZoom: 17, animate: true });
-    } else if (driverLocation) {
+      map.fitBounds(bounds, { padding: [60, 60], maxZoom: 16, animate: true });
+    } else if (isValidPos(driverLocation)) {
       map.flyTo([driverLocation.lat, driverLocation.lng], 16, { animate: true });
-    } else {
+    } else if (isValidPos(recogidaPos)) {
       map.flyTo([recogidaPos.lat, recogidaPos.lng], 16, { animate: true });
     }
   }, [driverLocation, recogidaPos, onCenterClick]);
 
   return (
-    <div className={`relative w-full overflow-hidden rounded-[2rem] bg-slate-50 border border-slate-200/90 shadow-xl ${className}`}>
+    <div className={`relative w-full overflow-hidden rounded-[2rem] bg-slate-50 border border-slate-200/90 shadow-xl ${className} notranslate`} translate="no">
       {/* Contenedor del Mapa Leaflet */}
       <div ref={containerRef} className="w-full h-full min-h-[380px] z-0" />
 
-      {/* REQUERIMIENTO 3: QUITA TODOS LOS BOTONES FLOTANTES. DEJA SOLO 1 CONTROL: CENTRAR EN MI UBICACIÓN ABAJO A LA DERECHA */}
+      {/* BOTÓN FLOTANTE "🎯 Centrar": SOLO se muestra cuando isFollowing === false */}
+      {!isFollowing && (
+        <button
+          type="button"
+          onClick={handleCenterOnLocation}
+          className="absolute bottom-24 right-4 z-[1000] flex items-center gap-2 px-4 py-2.5 rounded-full bg-white hover:bg-slate-50 text-blue-700 font-extrabold text-xs shadow-2xl border-2 border-blue-600 transition-all cursor-pointer active:scale-95 animate-pulse"
+          style={{
+            position: 'absolute',
+            bottom: 80,
+            right: 16,
+            zIndex: 1000,
+            background: '#ffffff',
+            borderRadius: '9999px',
+            padding: '10px 18px',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
+            border: '2px solid #2563eb',
+            fontWeight: 800,
+            color: '#1e3a8a',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+          }}
+        >
+          <span className="text-base">🎯</span>
+          <span>Centrar</span>
+        </button>
+      )}
+
+      {/* Botón icono de centrado abajo a la derecha */}
       <button
         type="button"
         onClick={handleCenterOnLocation}
-        className="absolute bottom-24 right-4 z-[400] w-12 h-12 rounded-2xl bg-white hover:bg-slate-50 active:scale-95 text-slate-800 shadow-xl border border-slate-200 flex items-center justify-center transition-all cursor-pointer group"
+        className={`absolute bottom-24 right-4 z-[400] w-12 h-12 rounded-2xl bg-white hover:bg-slate-50 active:scale-95 shadow-xl border border-slate-200 flex items-center justify-center transition-all cursor-pointer group ${
+          !isFollowing ? 'border-blue-400 ring-2 ring-blue-300' : ''
+        }`}
         title="Centrar conductor y recogida"
         aria-label="Centrar en mi ubicación"
       >
-        <LocateFixed size={20} className="text-blue-600 group-hover:scale-110 transition-transform" />
+        <LocateFixed
+          size={20}
+          className={`${
+            isFollowing ? 'text-blue-600' : 'text-slate-400'
+          } group-hover:scale-110 transition-transform`}
+        />
       </button>
 
-      {/* REQUERIMIENTO 3: BARRA INFERIOR FLOTANTE OSCURA: "📍 1.3 km | ⏱️ 2 min" CALCULADA DESDE LA RUTA REAL */}
+      {/* Barra inferior flotante oscura */}
       <div className="absolute bottom-4 left-4 right-4 z-[400] bg-slate-950/95 backdrop-blur-md text-white px-5 py-3.5 rounded-2xl shadow-2xl border border-slate-800 flex items-center justify-between gap-4">
         {/* Indicador de estado y nombre */}
         <div className="flex items-center gap-3 min-w-0">
@@ -751,6 +893,11 @@ export const EnCaminoMap: React.FC<EnCaminoMapProps> = ({
             ⏱️ {routeInfo.durationMin} min
           </span>
         </div>
+      </div>
+
+      {/* Insignia OpenStreetMap */}
+      <div className="absolute top-3 left-3 text-[9px] font-semibold text-slate-600 bg-white/85 backdrop-blur-xs px-2 py-0.5 rounded-md pointer-events-none z-[400] shadow-xs">
+        © OpenStreetMap
       </div>
     </div>
   );

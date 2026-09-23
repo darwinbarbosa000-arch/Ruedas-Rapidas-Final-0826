@@ -46,7 +46,11 @@
 
 .en-camino-driver-icon,
 .en-camino-pickup-icon,
-.en-camino-dest-icon {
+.en-camino-dest-icon,
+.custom-driver-marker-wrapper,
+.custom-pickup-marker-wrapper,
+.custom-dest-marker-wrapper,
+.custom-location-marker-wrapper {
   background: transparent !important;
   border: none !important;
 }

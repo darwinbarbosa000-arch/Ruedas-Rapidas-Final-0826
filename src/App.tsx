@@ -5700,7 +5700,7 @@ export default function App() {
                                {(viaje.estado === 'aceptado' || viaje.estado === 'en_camino' || viaje.estado === 'llegando' || viaje.estado === 'en_transito') && (
                                  <div className="w-full space-y-3">
                                    {(() => {
-                                     const { origen, destino } = getTripRoutePoints(viaje);
+                                     const { origen, destino, driverPos } = getTripRoutePoints(viaje);
                                      return (
                                        <RideTracker
                                          driverId={viaje.conductorId}
@@ -5708,6 +5708,7 @@ export default function App() {
                                          vehicleType={viaje.tipo || viaje.conductorVehiculo?.tipo}
                                          passengerPoint={origen}
                                          destinationPoint={destino}
+                                         driverPoint={driverPos}
                                          status={viaje.estado}
                                        />
                                      );
@@ -6934,12 +6935,14 @@ export default function App() {
                                       </div>
                                     )}
                                     {(() => {
-                                      const { origen, destino } = getTripRoutePoints(viaje, driverGpsLocation);
+                                      const { origen, destino, driverPos } = getTripRoutePoints(viaje, driverGpsLocation);
                                       return (
                                         <DriverLiveMap 
                                           driverId={user.uid} 
                                           driverName={conductor.nombre} 
+                                          vehicleType={conductor.vehiculo?.tipo || viaje.tipo}
                                           isOnline={conductor.activo} 
+                                          driverPos={driverPos}
                                           origen={origen}
                                           destino={destino}
                                           showRoute={true}

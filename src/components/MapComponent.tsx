@@ -429,16 +429,16 @@ export const MapComponent: React.FC<MapComponentProps> = ({
         attributionControl: false,
       });
 
-      // Capa de mosaicos (CartoDB Voyager / OpenStreetMap CDN para alta concurrencia)
+      // Capa de mosaicos (OpenStreetMap 100% puro gratis / Esri World Imagery para satélite)
       const tileUrl =
         tileMode === 'satellite'
           ? 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
-          : 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
+          : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
 
       const tileLayer = L.tileLayer(tileUrl, {
-        subdomains: 'abcd',
+        attribution: '&copy; OpenStreetMap',
         maxNativeZoom: 19,
-        maxZoom: 20,
+        maxZoom: 19,
         crossOrigin: true,
       }).addTo(map);
 
@@ -501,12 +501,12 @@ export const MapComponent: React.FC<MapComponentProps> = ({
     const tileUrl =
       tileMode === 'satellite'
         ? 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
-        : 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
+        : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
 
     const newTileLayer = L.tileLayer(tileUrl, {
-      subdomains: 'abcd',
+      attribution: '&copy; OpenStreetMap',
       maxNativeZoom: 19,
-      maxZoom: 20,
+      maxZoom: 19,
       crossOrigin: true,
     }).addTo(map);
 
@@ -914,7 +914,7 @@ export const MapComponent: React.FC<MapComponentProps> = ({
 
       {/* Insignia de OpenStreetMap / Base Tecnológica */}
       <div className="absolute bottom-1 right-2 text-[9px] font-semibold text-slate-500/80 bg-white/70 backdrop-blur-xs px-1.5 py-0.5 rounded-md pointer-events-none z-[400]">
-        © OpenStreetMap • CARTO • Esri
+        © OpenStreetMap • Esri
       </div>
     </div>
   );
