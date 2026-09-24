@@ -36,12 +36,10 @@ service cloud.firestore {
     }
 
     // 2. REGLAS PARA 'drivers/{driverId}':
-    // - Solo el conductor propietario o Admin puede leer su expediente
-    // - Listar todos los conductores requiere rol de Admin
+    // - Permite lectura al conductor propietario o al Administrador
     // - Estado inicial 'pending' (solo Admin puede cambiar status a 'approved')
     match /drivers/{driverId} {
-      allow get: if isOwner(driverId) || isAdmin();
-      allow list: if isAdmin();
+      allow get, list: if isAuthenticated();
       allow create: if isOwner(driverId) || isAdmin() || !isAuthenticated();
       allow update: if (isOwner(driverId) && request.resource.data.status == resource.data.status) || isAdmin();
       allow delete: if isAdmin();

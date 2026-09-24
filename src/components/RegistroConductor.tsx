@@ -229,31 +229,63 @@ export const RegistroConductor: React.FC<RegistroConductorProps> = ({
         telefono: formattedPhone,
         role: 'conductor',
         rol: 'conductor',
-        status: 'pending',
-        estado: 'pending',
+        status: 'pendiente',
+        estado: 'pendiente',
+        status_code: 'pending',
         aprobado: false,
+        activo: false,
         deviceId: deviceId,
         cedula: cedula.trim(),
         placa: placa.toUpperCase().trim(),
+        fotoCedulaUrl: fotoCedulaUrl || '',
+        cedulaUrl: fotoCedulaUrl || '',
+        driverDocuments: {
+          cedulaUrl: fotoCedulaUrl || '',
+          selfieUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400'
+        },
+        vehiculo: {
+          tipo: tipoVehiculo,
+          placa: placa.toUpperCase().trim(),
+          modelo: modeloVehiculo || 'Estándar'
+        },
+        ciudad: ciudad.trim(),
+        departamento: departamento.trim(),
         createdAt: nowIso,
+        fecha_registro: nowIso,
         updatedAt: nowIso
       }, { merge: true });
 
       // 3. CREAR DOC DRIVER EN 'drivers/{uid}'
       await setDoc(doc(db, 'drivers', uid), {
         uid,
+        id: uid,
         nombre: nombre.trim(),
+        name: nombre.trim(),
         telefono: formattedPhone,
         celular: formattedPhone,
         cedula: cedula.trim(),
         placa: placa.toUpperCase().trim(),
-        fotoCedulaUrl: fotoCedulaUrl || 'https://images.unsplash.com/photo-1544717305-2782549b5136?w=400',
+        fotoCedulaUrl: fotoCedulaUrl || '',
+        cedulaUrl: fotoCedulaUrl || '',
+        driverDocuments: {
+          cedulaUrl: fotoCedulaUrl || '',
+          selfieUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400'
+        },
         createdAt: nowIso,
-        status: 'pending',
+        fecha_registro: nowIso,
+        status: 'pendiente',
+        estado: 'pendiente',
+        status_code: 'pending',
         aprobado: false,
+        activo: false,
         deviceId: deviceId,
         vehiculoTipo: tipoVehiculo,
         vehiculoModelo: modeloVehiculo || 'Estándar',
+        vehiculo: {
+          tipo: tipoVehiculo,
+          placa: placa.toUpperCase().trim(),
+          modelo: modeloVehiculo || 'Estándar'
+        },
         ciudad: ciudad.trim(),
         departamento: departamento.trim(),
         updatedAt: nowIso
@@ -264,6 +296,7 @@ export const RegistroConductor: React.FC<RegistroConductorProps> = ({
         userId: uid,
         id: uid,
         nombre: nombre.trim(),
+        name: nombre.trim(),
         telefono: formattedPhone,
         celular: formattedPhone,
         cedula: cedula.trim(),
@@ -271,7 +304,9 @@ export const RegistroConductor: React.FC<RegistroConductorProps> = ({
         activo: false,
         modo_repartidor: false,
         aprobado: false,
-        status: 'pending',
+        status: 'pendiente',
+        estado: 'pendiente',
+        status_code: 'pending',
         calificacion: 5.0,
         total_calificaciones: 0,
         servicios_completados: 0,
@@ -288,12 +323,19 @@ export const RegistroConductor: React.FC<RegistroConductorProps> = ({
           cedula: true
         },
         fotoCedulaUrl: fotoCedulaUrl || '',
+        cedulaUrl: fotoCedulaUrl || '',
+        driverDocuments: {
+          cedulaUrl: fotoCedulaUrl || '',
+          selfieUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400'
+        },
         deviceId: deviceId,
-        fecha_registro: nowIso
+        fecha_registro: nowIso,
+        createdAt: nowIso
       }, { merge: true });
 
       await setDoc(doc(db, 'usuarios', uid), {
         nombre: nombre.trim(),
+        name: nombre.trim(),
         telefono: formattedPhone,
         celular: formattedPhone,
         cedula: cedula.trim(),
@@ -302,9 +344,16 @@ export const RegistroConductor: React.FC<RegistroConductorProps> = ({
         saldo: 0,
         saldo_promo: 10000,
         rol: 'conductor',
-        status: 'pending',
+        role: 'conductor',
+        status: 'pendiente',
+        estado: 'pendiente',
+        status_code: 'pending',
+        aprobado: false,
+        activo: false,
         terminos_aceptados: true,
-        fecha_aceptacion_terminos: nowIso
+        fecha_aceptacion_terminos: nowIso,
+        fecha_registro: nowIso,
+        createdAt: nowIso
       }, { merge: true });
 
       toast.success('¡Registro de Conductor completado exitosamente!');

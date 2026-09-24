@@ -50,6 +50,10 @@ import DriverOfferModal from './components/DriverOfferModal';
 import RegistroConductor from './components/RegistroConductor';
 import { ViajeSeguroCompartido } from './components/ViajeSeguroCompartido';
 import { BotonCompartirRutaSegura } from './components/BotonCompartirRutaSegura';
+import { AdminDesktopLayout } from './components/AdminDesktopLayout';
+import { AdminLiveControlCenter } from './components/AdminLiveControlCenter';
+import { AdminGlobalLiveMap } from './components/AdminGlobalLiveMap';
+import { AdminUsersModule } from './components/AdminUsersModule';
 
 const GOOGLE_MAPS_LIBRARIES: ("places")[] = ['places'];
 
@@ -1096,7 +1100,7 @@ export default function App() {
     }
   };
 
-  const [adminSubTab, setAdminSubTab] = useState<'resumen' | 'recargas' | 'conductores' | 'usuarios' | 'espera' | 'alertas' | 'soporte' | 'historial' | 'ranking' | 'aliados' | 'activacion' | 'depuracion'>('resumen');
+  const [adminSubTab, setAdminSubTab] = useState<'resumen' | 'mapa_global' | 'recargas' | 'conductores' | 'usuarios' | 'espera' | 'alertas' | 'soporte' | 'historial' | 'ranking' | 'aliados' | 'activacion' | 'depuracion'>('resumen');
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
   const [allUsers, setAllUsers] = useState<any[]>([]);
   const [userSearchTerm, setUserSearchTerm] = useState('');
@@ -1381,6 +1385,18 @@ export default function App() {
   const [profileFormData, setProfileFormData] = useState({ nombre: '', celular: '', ciudad: '', departamento: '', genero: 'masculino' });
   const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
   const [showDriverRegModal, setShowDriverRegModal] = useState(false);
+  const [showActivacionModal, setShowActivacionModal] = useState(false);
+
+  const pendingDriversCount = useMemo(() => {
+    return allDrivers.filter(d => 
+      d.aprobado === false || 
+      d.status === 'pending' || 
+      d.status === 'pendiente' || 
+      d.estado === 'pending' || 
+      d.estado === 'pendiente' ||
+      (d.rol === 'conductor' && d.aprobado !== true)
+    ).length;
+  }, [allDrivers]);
   const [showRechargeModal, setShowRechargeModal] = useState(false);
   const [showChat, setShowChat] = useState(false);
   const [showSupportChat, setShowSupportChat] = useState(false);
@@ -4907,6 +4923,2032 @@ export default function App() {
     );
   }
 
+
+  const renderAdminDesktopContent = () => (
+    <div className="w-full space-y-6">
+      {/* 1. Dashboard Centro de Control DiDi en Tiempo Real */}
+      {adminSubTab === 'resumen' && (
+        <div className="space-y-8">
+          <AdminLiveControlCenter
+            allDrivers={allDrivers}
+            allTrips={allTrips}
+            allCancelledTrips={allCancelledTrips}
+            recargasPendientes={recargasPendientes}
+            unattendedTrips={unattendedTrips}
+            pendingDriversCount={pendingDriversCount}
+            calificacionesBajas={calificacionesBajas}
+            onNavigateTab={(tabId) => setAdminSubTab(tabId as any)}
+            onExportExcel={exportarOperacionTotal}
+          />
+          <AdminResumenFinanciero />
+        </div>
+      )}
+
+      {/* 2. Mapa en Vivo Global */}
+      {adminSubTab === 'mapa_global' && (
+        <div className="space-y-4">
+          <AdminGlobalLiveMap
+            drivers={allDrivers}
+            trips={allTrips}
+          />
+        </div>
+      )}
+
+      {/* 3. Subtabs Restantes (Ranking, Alertas, Espera, Historial, Finanzas, Flota, Usuarios, Soporte, Aliados, Depuracion) */}
+                        {adminSubTab === 'ranking' && (
+                          <div className="bg-white p-6 rounded-[3rem] border border-slate-100 shadow-xl overflow-hidden">
+                            <LeaderboardView />
+                          </div>
+                        )}
+
+                        {adminSubTab === 'alertas' && (
+                          <div className="space-y-4">
+                            <div className="flex items-center justify-between px-2">
+                              <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">Alertas de Seguridad (Baja Calificación)</h4>
+                              <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">{calificacionesBajas.length} Reportes</span>
+                            </div>
+
+                            {calificacionesBajas.length > 0 ? (
+                              <div className="space-y-3">
+                                {calificacionesBajas.map((calif, cIdx) => {
+                                  const driverInfo = allDrivers.find(d => d.id === calif.conductorId);
+                                  return (
+                                    <motion.div 
+                                      layout
+                                      key={`calif-baja-${calif.id || cIdx}-${cIdx}`}
+                                      className="bg-white p-5 rounded-[2rem] border border-slate-100 shadow-sm space-y-4"
+                                    >
+                                      <div className="flex justify-between items-start">
+                                        <div className="flex items-center gap-3">
+                                          <div className="w-10 h-10 bg-amber-50 rounded-xl flex items-center justify-center text-amber-600">
+                                            <ShieldAlert size={20} />
+                                          </div>
+                                          <div>
+                                            <p className="text-sm font-bold text-slate-800">Conductor: {driverInfo?.nombre || 'Desconocido'}</p>
+                                            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-tighter">ID: {calif.conductorId.slice(-8)}</p>
+                                          </div>
+                                        </div>
+                                        <div className="flex items-center gap-1 bg-amber-50 px-3 py-1 rounded-full">
+                                          {[1, 2, 3, 4, 5].map((star) => (
+                                            <Star 
+                                              key={`calif-star-${calif.id || cIdx}-${cIdx}-${star}`} 
+                                              size={12} 
+                                              className={star <= calif.estrellas ? "text-amber-500 fill-amber-500" : "text-slate-200"} 
+                                            />
+                                          ))}
+                                        </div>
+                                      </div>
+
+                                      <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                                        <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">Comentario del Usuario</p>
+                                        <p className="text-xs text-slate-700 italic">"{calif.comentario || 'Sin comentario'}"</p>
+                                      </div>
+
+                                      <div className="flex justify-between items-center pt-2 flex-wrap gap-2">
+                                        <div className="flex items-center gap-2">
+                                          {driverInfo?.bloqueado ? (
+                                            <AdminDriverBlockBadge cond={driverInfo} />
+                                          ) : (
+                                            <>
+                                              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                                              <span className="text-[10px] font-bold text-slate-500 uppercase">
+                                                Estado: Activo
+                                              </span>
+                                            </>
+                                          )}
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                          <button 
+                                            onClick={async () => {
+                                              try {
+                                                await deleteDoc(doc(db, 'calificaciones', calif.id));
+                                                toast('Notificación/Alerta resuelta y eliminada');
+                                              } catch (error) {
+                                                console.error("Error al eliminar la alerta:", error);
+                                                toast('Error al eliminar la notificación');
+                                              }
+                                            }}
+                                            className="px-4 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 hover:text-emerald-800 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1 border border-emerald-100 cursor-pointer"
+                                            title="Resolver y Eliminar Alerta"
+                                          >
+                                            <Check size={11} className="stroke-[3px]" />
+                                            Marcar como Leída / Resolver
+                                          </button>
+                                          <button 
+                                            onClick={() => {
+                                              setAdminActionType('confirm_bloqueo_conductor');
+                                              setAdminActionTarget(driverInfo);
+                                              setShowAdminActionModal(true);
+                                            }}
+                                            className={`px-4 py-2 rounded-xl text-[10px] font-bold uppercase transition-all cursor-pointer ${driverInfo?.bloqueado ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'}`}
+                                          >
+                                            {driverInfo?.bloqueado ? 'Desbloquear Sanción' : 'Bloquear Conductor'}
+                                          </button>
+                                        </div>
+                                      </div>
+                                    </motion.div>
+                                  );
+                                })}
+                              </div>
+                            ) : (
+                              <div className="py-16 text-center bg-slate-50 rounded-[2.5rem] border border-dashed border-slate-200 space-y-3">
+                                <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center mx-auto text-slate-200 shadow-sm">
+                                  <Check size={24} />
+                                </div>
+                                <p className="text-xs text-slate-400 font-medium">No hay reportes de baja calificación</p>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {adminSubTab === 'espera' && (
+                          <div className="space-y-8 animate-in fade-in duration-700">
+                            {/* Hero Alerta section */}
+                            {unattendedTrips.some(t => (currentTime.getTime() - new Date(t.fecha).getTime()) > 6 * 60 * 1000) && (
+                              <motion.div 
+                                initial={{ opacity: 0, y: -20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className="relative overflow-hidden group"
+                              >
+                                <div className="absolute inset-0 bg-gradient-to-r from-rose-500 to-rose-600 blur-xl opacity-20 animate-pulse" />
+                                <div className="relative bg-white/80 backdrop-blur-2xl border border-rose-100 p-8 rounded-[3rem] flex flex-col md:flex-row items-center gap-8 shadow-2xl shadow-rose-200/40">
+                                  <div className="w-20 h-20 bg-rose-500 rounded-[2rem] flex items-center justify-center text-white shadow-2xl shadow-rose-500/40 shrink-0 transform group-hover:rotate-12 transition-transform duration-500">
+                                    <AlertTriangle size={36} className="animate-bounce" />
+                                  </div>
+                                  <div className="flex-1 text-center md:text-left">
+                                    <h3 className="text-2xl font-black text-rose-950 uppercase tracking-[0.1em] mb-2 text-balance">Servicios en Riesgo Crítico</h3>
+                                    <p className="text-sm text-rose-600/80 font-medium leading-relaxed max-w-2xl px-4 md:px-0">
+                                      Detectamos usuarios con más de 6 minutos de espera sin asignación. Es imperativo contactar conductores cercanos o recalibrar la oferta.
+                                    </p>
+                                  </div>
+                                  <button className="px-8 py-4 bg-rose-600 text-white text-[10px] font-black rounded-2xl shadow-xl shadow-rose-200 hover:bg-rose-700 hover:shadow-rose-300 transition-all active:scale-95 uppercase tracking-[0.2em] whitespace-nowrap">
+                                    Intervenir Ahora
+                                  </button>
+                                </div>
+                              </motion.div>
+                            )}
+
+                            {/* Stats & Title Grid */}
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                              <div className="md:col-span-2 flex flex-col justify-end pb-2">
+                                <h2 className="text-4xl font-black text-slate-900 tracking-tighter mb-2">Monitor de <span className="text-indigo-600">Espera</span></h2>
+                                <p className="text-xs text-slate-400 font-bold uppercase tracking-widest flex items-center gap-2">
+                                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                                  Flujo de servicios en tiempo real
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-4 bg-white/50 backdrop-blur-xl p-4 rounded-[2rem] border border-white/60 shadow-sm self-end">
+                                <div className="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-600">
+                                  <Clock size={20} />
+                                </div>
+                                <div>
+                                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">En cola activa</p>
+                                  <p className="text-2xl font-mono font-black text-slate-900">{unattendedTrips.length} SOLICITUDES</p>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Active Queue By City */}
+                            <div className="space-y-12">
+                              {Object.keys(unattendedByCity).length > 0 ? Object.entries(unattendedByCity).map(([city, trips], cityIdx) => {
+                                const cityDrivers = availableDriversByCity[city] || [];
+                                const criticalCount = trips.filter(t => (currentTime.getTime() - new Date(t.fecha).getTime()) > 6 * 60 * 1000).length;
+
+                                return (
+                                  <div key={`unattended-city-${city || cityIdx}-${cityIdx}`} className="space-y-6">
+                                    {/* City Header */}
+                                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-4">
+                                      <div className="flex items-center gap-4">
+                                        <div className="w-12 h-12 bg-slate-900 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-slate-200">
+                                          <MapPin size={24} />
+                                        </div>
+                                        <div>
+                                          <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tight">{city}</h3>
+                                          <div className="flex items-center gap-3">
+                                            <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">{trips.length} Solicitudes</span>
+                                            <span className="w-1 h-1 bg-slate-200 rounded-full" />
+                                            <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">{cityDrivers.length} Disponibles</span>
+                                          </div>
+                                        </div>
+                                      </div>
+                                      
+                                      {criticalCount > 0 && (
+                                        <div className="px-4 py-2 bg-rose-50 border border-rose-100 rounded-xl flex items-center gap-2 animate-pulse">
+                                          <AlertCircle size={14} className="text-rose-500" />
+                                          <span className="text-[10px] font-black text-rose-600 uppercase tracking-widest">{criticalCount} CRÍTICOS</span>
+                                        </div>
+                                      )}
+                                    </div>
+
+                                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                                      {/* Trips Column */}
+                                      <div className="lg:col-span-2 space-y-4">
+                                        <div className="flex items-center gap-2 px-4">
+                                          <div className="h-[2px] w-4 bg-indigo-500 rounded-full" />
+                                          <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">Servicios Pendientes</span>
+                                        </div>
+                                        <div className="grid gap-4">
+                                          {trips.sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime()).map((trip, idx) => {
+                                            const diffMin = Math.floor((currentTime.getTime() - new Date(trip.fecha).getTime()) / 60000);
+                                            const urgency = diffMin > 8 ? 'critical' : diffMin > 4 ? 'high' : 'normal';
+                                            
+                                            return (
+                                              <motion.div 
+                                                layout
+                                                initial={{ opacity: 0, y: 10 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                transition={{ delay: idx * 0.05 }}
+                                                key={`city-unattended-trip-${trip.id || idx}-${idx}`}
+                                                className={`group bg-white rounded-[2.5rem] border-2 transition-all p-6 ${
+                                                  urgency === 'critical' ? 'border-rose-100 bg-rose-50/10' : 
+                                                  urgency === 'high' ? 'border-amber-100 bg-amber-50/10' : 'border-slate-50'
+                                                } hover:shadow-xl hover:shadow-slate-200/40`}
+                                              >
+                                                <div className="flex flex-col gap-6">
+                                                  <div className="flex items-start justify-between">
+                                                    <div className="flex items-center gap-4">
+                                                      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-lg font-black shrink-0 ${
+                                                        urgency === 'critical' ? 'bg-rose-500 text-white' : 'bg-slate-100 text-slate-400'
+                                                      }`}>
+                                                        {trip.usuarioNombre?.charAt(0) || 'U'}
+                                                      </div>
+                                                      <div>
+                                                        <h4 className="text-base font-black text-slate-900 truncate uppercase tracking-tight">{trip.usuarioNombre}</h4>
+                                                        <div className="flex items-center gap-2 mt-1">
+                                                          <span className="px-2 py-0.5 bg-slate-900 text-white text-[8px] font-black rounded-md uppercase">
+                                                            {trip.tipo || 'Viaje'}
+                                                          </span>
+                                                          <span className="text-[10px] font-black text-indigo-600">${trip.valor?.toLocaleString()}</span>
+                                                        </div>
+                                                      </div>
+                                                    </div>
+                                                    <div className={`px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest ${
+                                                      urgency === 'critical' ? 'bg-rose-500 text-white animate-pulse' : 
+                                                      urgency === 'high' ? 'bg-amber-500 text-white' : 'bg-slate-900 text-white'
+                                                    }`}>
+                                                      {diffMin}m esperando
+                                                    </div>
+                                                  </div>
+
+                                                  <div className="space-y-2">
+                                                    <div className="flex items-center gap-3">
+                                                      <div className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+                                                      <p className="text-[11px] font-bold text-slate-500 truncate">{trip.ruta?.origen?.split(',')[0] || trip.origenTexto}</p>
+                                                    </div>
+                                                    <div className="flex items-center gap-3">
+                                                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                                      <p className="text-[11px] font-black text-slate-700 truncate">{trip.ruta?.destino?.split(',')[0] || trip.destinoTexto}</p>
+                                                    </div>
+                                                  </div>
+
+                                                  <div className="flex gap-2">
+                                                    <button 
+                                                      onClick={() => {
+                                                        let phone = trip.usuarioTelefono?.replace(/\D/g, '') || '';
+                                                        if (!phone) {
+                                                          toast.error("El usuario no tiene un teléfono registrado");
+                                                          return;
+                                                        }
+                                                        if (phone.length === 10) phone = `57${phone}`;
+                                                        
+                                                        const mensaje = encodeURIComponent(`Hola ${trip.usuarioNombre}, soy el administrador de Ruedas Rápidas. Vemos que tienes un servicio en espera, ¿todo bien?`);
+                                                        window.open(`https://wa.me/${phone}?text=${mensaje}`, '_blank');
+                                                      }}
+                                                      className="flex-1 h-10 bg-emerald-500 text-white rounded-xl font-black text-[9px] uppercase tracking-widest flex items-center justify-center gap-1.5 hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-100 cursor-pointer"
+                                                    >
+                                                      <Headphones size={13} />
+                                                      LLAMAR
+                                                    </button>
+                                                    <button 
+                                                      onClick={() => {
+                                                        setAdminMessageTarget({ id: trip.usuarioId, nombre: trip.usuarioNombre, type: 'usuario' });
+                                                        setShowAdminMessageModal(true);
+                                                      }}
+                                                      className="flex-1 h-10 bg-slate-900 text-white rounded-xl font-black text-[9px] uppercase tracking-widest flex items-center justify-center gap-1.5 hover:bg-black transition-all shadow-lg shadow-slate-200 cursor-pointer"
+                                                    >
+                                                      <MessageCircle size={13} />
+                                                      NOTIFICAR
+                                                    </button>
+                                                    <button 
+                                                      onClick={() => {
+                                                        setSelectedTripForAdminCancel(trip);
+                                                        setAdminCancelReason('Tiempo de espera prolongado');
+                                                        setAdminCancelCustomReason('');
+                                                        setShowAdminCancelTripModal(true);
+                                                      }}
+                                                      className="flex-1 h-10 bg-rose-50 text-rose-600 border border-rose-100 rounded-xl font-black text-[9px] uppercase tracking-widest flex items-center justify-center gap-1.5 hover:bg-rose-100 transition-all shadow-md shadow-rose-100/50 cursor-pointer"
+                                                    >
+                                                      <XCircle size={13} />
+                                                      ANULAR
+                                                    </button>
+                                                  </div>
+                                                </div>
+                                              </motion.div>
+                                            );
+                                          })}
+                                        </div>
+                                      </div>
+
+                                      {/* Available Drivers Column */}
+                                      <div className="space-y-4">
+                                        <div className="flex items-center gap-2 px-4">
+                                          <div className="h-[2px] w-4 bg-emerald-500 rounded-full" />
+                                          <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">Flota Disponible</span>
+                                        </div>
+                                        <div className="bg-slate-50/50 rounded-[2.5rem] border border-slate-100 p-6 space-y-4 max-h-[600px] overflow-y-auto no-scrollbar">
+                                          {cityDrivers.length > 0 ? cityDrivers.map((d, dIdx) => (
+                                            <motion.div 
+                                              initial={{ opacity: 0, x: 20 }}
+                                              animate={{ opacity: 1, x: 0 }}
+                                              transition={{ delay: dIdx * 0.05 }}
+                                              key={`city-driver-${d.id || dIdx}-${dIdx}`}
+                                              className="bg-white p-4 rounded-2xl border border-slate-100 flex items-center gap-4 group hover:border-emerald-200 transition-all shadow-sm"
+                                            >
+                                              <div className="relative">
+                                                <div className="w-12 h-12 bg-slate-900 rounded-xl flex items-center justify-center shrink-0 overflow-hidden">
+                                                  {d.foto ? (
+                                                    <img src={d.foto} alt="" className="w-full h-full object-cover" />
+                                                  ) : (
+                                                    <UserIcon className="text-white/20" size={20} />
+                                                  )}
+                                                </div>
+                                                <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 border-2 border-white rounded-full" />
+                                              </div>
+                                              <div className="flex-1 min-w-0">
+                                                <h5 className="text-xs font-black text-slate-800 uppercase truncate leading-tight">{d.nombre}</h5>
+                                                <div className="flex items-center gap-2 mt-1">
+                                                  <div className="flex items-center gap-0.5">
+                                                    <Star size={8} className="text-amber-500 fill-amber-500" />
+                                                    <span className="text-[9px] font-bold text-amber-600">{d.calificacion?.toFixed(1) || '5.0'}</span>
+                                                  </div>
+                                                  <span className="text-[8px] font-black text-slate-400 uppercase tracking-tighter truncate max-w-[80px]">
+                                                    {d.vehiculo?.modelo || d.vehiculo?.tipo}
+                                                  </span>
+                                                </div>
+                                              </div>
+                                              <button 
+                                                onClick={() => {
+                                                  let phone = d.telefono?.replace(/\D/g, '') || '';
+                                                  if (!phone) {
+                                                    toast.error("El conductor no tiene un teléfono registrado");
+                                                    return;
+                                                  }
+                                                  
+                                                  // Hardening for Colombia: if 10 digits, add 57. If starts with 57, keep it.
+                                                  if (phone.length === 10) {
+                                                    phone = `57${phone}`;
+                                                  } else if (phone.length > 10 && phone.startsWith('0')) {
+                                                    // some old formats or mistakes
+                                                    phone = `57${phone.substring(1)}`;
+                                                  }
+
+                                                  const mensaje = encodeURIComponent(`Hola ${d.nombre}, hay servicios pendientes en ${city}. ¿Estás disponible?`);
+                                                  window.open(`https://wa.me/${phone}?text=${mensaje}`, '_blank');
+                                                }}
+                                                className="h-10 px-4 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center gap-2 hover:bg-emerald-600 hover:text-white transition-all font-black text-[9px] uppercase tracking-widest shadow-sm border border-emerald-100"
+                                                title="Gestionar por WhatsApp"
+                                              >
+                                                <MessageCircle size={14} />
+                                                GESTIONAR
+                                              </button>
+                                            </motion.div>
+                                          )) : (
+                                            <div className="py-12 text-center space-y-4">
+                                              <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center mx-auto text-rose-200 border border-rose-50 shadow-sm">
+                                                <ShieldAlert size={28} />
+                                              </div>
+                                              <p className="text-[10px] font-black text-rose-400 uppercase tracking-widest px-4">Sin conductores disponibles en esta ciudad</p>
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              }) : (
+                                <div className="py-32 text-center bg-white rounded-[4rem] border-2 border-slate-50 border-dashed space-y-8">
+                                  <div className="relative mx-auto w-32 h-32">
+                                    <div className="absolute inset-0 bg-emerald-500/5 rounded-full animate-pulse scale-150 blur-3xl" />
+                                    <div className="relative w-full h-full bg-white rounded-[3rem] border border-slate-100 flex items-center justify-center text-emerald-500 shadow-2xl">
+                                      <ShieldCheck size={56} strokeWidth={1.5} />
+                                    </div>
+                                  </div>
+                                  <div className="space-y-2">
+                                    <h4 className="text-2xl font-black text-slate-900 tracking-tight">Zona Despejada</h4>
+                                    <p className="text-sm text-slate-400 font-medium px-8 mx-auto max-sm:px-4 max-w-sm">No hay servicios detenidos. El sistema fluye con normalidad operativa.</p>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {adminSubTab === 'historial' && (
+                          <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                            {/* Analytics section - Simplified for elegance */}
+                            <div className="relative overflow-hidden group">
+                              <div className="absolute inset-0 bg-slate-900 rounded-[3.5rem]" />
+                              <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/20 to-rose-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-1000" />
+                              <div className="relative p-12 text-white">
+                                <div className="flex flex-col lg:flex-row gap-12">
+                                  {/* Stats Summary */}
+                                  <div className="lg:w-1/3 space-y-10">
+                                    <div className="space-y-4">
+                                      <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-rose-500 rounded-full text-[10px] font-black uppercase tracking-[0.2em] shadow-xl shadow-rose-900/40">
+                                        Auditoría Crítica
+                                      </div>
+                                      <h3 className="text-4xl font-black tracking-tighter leading-tight">Métricas de <br/><span className="text-rose-400">Deserción</span></h3>
+                                      <p className="text-slate-400 text-sm font-medium leading-relaxed">Información consolidada de cancelaciones por usuario, conductor y sistema.</p>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                      <div className="bg-white/5 p-6 rounded-3xl border border-white/5">
+                                        <p className="text-[9px] font-black text-slate-400 uppercase mb-2">Total Hoy</p>
+                                        <p className="text-3xl font-mono font-black">{historicalWaitingStats.todayStats.total}</p>
+                                      </div>
+                                      <div className="bg-white/5 p-6 rounded-3xl border border-white/5">
+                                        <p className="text-[9px] font-black text-slate-400 uppercase mb-2">Valor Perdido</p>
+                                        <p className="text-xl font-mono font-black text-rose-400">${historicalWaitingStats.todayStats.valorTotal.toLocaleString()}</p>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  {/* Trend Chart */}
+                                  <div className="lg:flex-1 bg-white/5 p-8 rounded-[3rem] border border-white/10 flex flex-col">
+                                    <div className="flex justify-between items-center mb-8">
+                                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Histórico Semanal</p>
+                                      <div className="flex gap-2">
+                                        <div className="w-2 h-2 rounded-full bg-rose-500" />
+                                        <div className="w-2 h-2 rounded-full bg-white/10" />
+                                      </div>
+                                    </div>
+                                    <div className="h-64">
+                                      <ResponsiveContainer width="100%" height="100%">
+                                        <AreaChart data={historicalWaitingStats.trend}>
+                                          <defs>
+                                            <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
+                                              <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.3}/>
+                                              <stop offset="95%" stopColor="#f43f5e" stopOpacity={0}/>
+                                            </linearGradient>
+                                          </defs>
+                                          <XAxis dataKey="name" hide />
+                                          <Tooltip 
+                                            contentStyle={{ backgroundColor: '#0f172a', border: 'none', borderRadius: '1rem', fontSize: '10px' }}
+                                            itemStyle={{ color: '#fff' }}
+                                          />
+                                          <Area type="monotone" dataKey="total" stroke="#f43f5e" strokeWidth={4} fillOpacity={1} fill="url(#colorTotal)" />
+                                        </AreaChart>
+                                      </ResponsiveContainer>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Detailed Cancellation Feed - Persists even after notification clear */}
+                            <div className="bg-white rounded-[3.5rem] border border-slate-100 shadow-sm p-10">
+                              <div className="flex items-center justify-between mb-10">
+                                <div>
+                                  <h4 className="text-xl font-black text-slate-900 tracking-tight">Registro Maestro de Cancelaciones</h4>
+                                  <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">Archivo histórico de hoy - Datos Inmutables</p>
+                                </div>
+                                <div className="text-right">
+                                  <p className="text-2xl font-mono font-black text-indigo-600">{historicalWaitingStats.todayCancelled.length}</p>
+                                  <p className="text-[8px] font-black text-slate-400 uppercase uppercase">Incidentes</p>
+                                </div>
+                              </div>
+                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                {historicalWaitingStats.todayCancelled.slice(0, 18).map((trip: any, tIdx: number) => (
+                                  <div key={`today-cancelled-${trip.id || tIdx}-${tIdx}`} className="p-6 bg-slate-50 rounded-[2.5rem] border border-slate-100 hover:bg-white hover:shadow-2xl hover:shadow-slate-200/50 transition-all group overflow-hidden">
+                                    <div className="flex justify-between items-start mb-6">
+                                      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-xl ${
+                                        trip.canceladoPor === 'usuario' ? 'bg-indigo-500 shadow-indigo-100' :
+                                        trip.canceladoPor === 'conductor' ? 'bg-amber-500 shadow-amber-100' : 'bg-slate-800 shadow-slate-100'
+                                      }`}>
+                                        {trip.canceladoPor === 'usuario' ? <UserIcon size={20} /> : <Car size={20} />}
+                                      </div>
+                                      <p className="text-[10px] font-mono font-black text-slate-400">
+                                        {new Date(trip.fecha_cancelacion || trip.fecha).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                      </p>
+                                    </div>
+                                    <div className="space-y-4">
+                                      <div>
+                                        <p className="text-sm font-black text-slate-800 truncate">{trip.usuarioNombre}</p>
+                                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter mt-0.5">Cliente del servicio</p>
+                                      </div>
+                                      <div className="space-y-1">
+                                         <div className="flex items-center gap-2 text-[10px] font-bold text-slate-500 truncate">
+                                          <MapPin size={10} className="shrink-0 text-indigo-400" />
+                                          {trip.ruta?.origen?.split(',')[0]}
+                                        </div>
+                                        <div className="flex items-center gap-2 text-[10px] font-bold text-slate-500 truncate">
+                                          <Navigation size={10} className="shrink-0 text-emerald-400" />
+                                          {trip.ruta?.destino?.split(',')[0]}
+                                        </div>
+                                      </div>
+
+                                      {/* City Metadata */}
+                                      <div className="pt-3 border-t border-slate-100 flex gap-4">
+                                        <div className="flex flex-col">
+                                          <span className="text-[7px] font-black text-slate-400 uppercase tracking-widest">Ciudad Usuario</span>
+                                          <span className="text-[9px] font-bold text-slate-700 truncate">{trip.usuarioCiudad || trip.ciudad || 'N/A'}</span>
+                                        </div>
+                                        {trip.conductorId && (
+                                          <div className="flex flex-col border-l border-slate-100 pl-4">
+                                            <span className="text-[7px] font-black text-slate-400 uppercase tracking-widest">Ciudad Conductor</span>
+                                            <span className="text-[9px] font-bold text-slate-700 truncate">{trip.conductorCiudad || 'N/A'}</span>
+                                          </div>
+                                        )}
+                                      </div>
+
+                                      <div className="pt-4 border-t border-slate-200 flex items-center justify-between">
+                                        <span className={`text-[8px] font-black px-2 py-1 rounded-lg uppercase ${
+                                          trip.estado === 'finalizado_cancelado' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'
+                                        }`}>
+                                          {trip.estado === 'finalizado_cancelado' ? 'Auditado' : 'Pendiente'}
+                                        </span>
+                                        <div className="flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                          <button 
+                                            onClick={() => {
+                                              setAdminMessageTarget({ id: trip.usuarioId, nombre: trip.usuarioNombre, type: 'usuario' });
+                                              setShowAdminMessageModal(true);
+                                            }}
+                                            className="w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:text-indigo-600 hover:border-indigo-100 transition-all font-bold"
+                                          >
+                                            <MessageCircle size={14} />
+                                          </button>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                              {historicalWaitingStats.todayCancelled.length === 0 && (
+                                <div className="py-20 text-center opacity-40">
+                                  <p className="text-[10px] font-black uppercase tracking-[0.3em]">Sin registros negativos hoy</p>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                        {adminSubTab === 'recargas' && (
+                        <div className="space-y-6">
+                          {/* Financial BI Dashboard Header */}
+                          <div className="bg-slate-900 p-6 rounded-[2.5rem] text-white shadow-xl shadow-slate-200 relative overflow-hidden">
+                            <div className="absolute top-0 right-0 p-8 opacity-10">
+                              <CreditCard size={120} />
+                            </div>
+                            <div className="relative z-10">
+                              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-12 h-12 bg-indigo-500 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-500/20">
+                                    <CreditCard size={24} />
+                                  </div>
+                                  <div>
+                                    <h3 className="text-lg font-black uppercase tracking-widest">Dashboard Financiero</h3>
+                                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">Recaudos y flujo de caja</p>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-3 bg-white/5 backdrop-blur-md px-4 py-2 rounded-2xl border border-white/10">
+                                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                  <p className="text-[9px] font-black uppercase tracking-widest text-slate-300">Hoy:</p>
+                                  <p className="text-lg font-mono font-black text-emerald-400">${rechargesStats.dailyTotal.toLocaleString()}</p>
+                                </div>
+                              </div>
+
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div className="bg-white/5 p-4 rounded-2xl border border-white/5 hover:bg-white/10 transition-colors">
+                                  <div className="flex items-center justify-between mb-1">
+                                    <p className="text-[8px] font-black text-indigo-400 uppercase tracking-widest">Recaudación Aprobada</p>
+                                    <span className="text-[8px] font-bold bg-indigo-500/20 text-indigo-300 px-1.5 py-0.5 rounded-full">{rechargesStats.approvedCount}</span>
+                                  </div>
+                                  <p className="text-2xl font-mono font-black text-white">${rechargesStats.totalCalculated.toLocaleString()}</p>
+                                </div>
+
+                                <div className="bg-white/5 p-4 rounded-2xl border border-white/5 hover:bg-white/10 transition-colors">
+                                  <div className="flex items-center justify-between mb-1">
+                                    <p className="text-[8px] font-black text-amber-400 uppercase tracking-widest">Ajustes Manuales</p>
+                                    <span className="text-[8px] font-bold bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded-full">{rechargesStats.manualCount}</span>
+                                  </div>
+                                  <p className="text-2xl font-mono font-black text-white">${rechargesStats.totalManuales.toLocaleString()}</p>
+                                </div>
+
+                                <div className="bg-white/5 p-4 rounded-2xl border border-white/5 hover:bg-white/10 transition-colors">
+                                  <div className="flex items-center justify-between mb-1">
+                                    <p className="text-[8px] font-black text-emerald-400 uppercase tracking-widest">Cierre Mes</p>
+                                  </div>
+                                  <p className="text-2xl font-mono font-black text-white">${rechargesStats.monthlyTotal.toLocaleString()}</p>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Charts Section */}
+                          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            <div className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-xl hover:shadow-slate-200/50 transition-all duration-500">
+                              <div className="flex items-center justify-between mb-8">
+                                <div>
+                                  <h4 className="text-[10px] font-black text-slate-800 uppercase tracking-[0.2em]">Curva de Recaudos (7D)</h4>
+                                  <p className="text-[8px] text-slate-400 font-bold uppercase mt-0.5">Tendencia semanal de ingresos</p>
+                                </div>
+                                <div className="flex gap-2">
+                                  <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-500 flex items-center justify-center">
+                                    <Zap size={14} />
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="h-48 w-full">
+                                <ResponsiveContainer width="100%" height="100%">
+                                  <AreaChart data={rechargesStats.last7Days}>
+                                    <defs>
+                                      <linearGradient id="colorTotalRec" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#6366f1" stopOpacity={0.2}/>
+                                        <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
+                                      </linearGradient>
+                                    </defs>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                                    <XAxis 
+                                      dataKey="name" 
+                                      axisLine={false} 
+                                      tickLine={false} 
+                                      tick={{ fontSize: 9, fontWeight: 900, fill: '#94a3b8' }} 
+                                    />
+                                    <Tooltip 
+                                      contentStyle={{ borderRadius: '1.5rem', border: 'none', boxShadow: '0 25px 50px -12px rgb(0 0 0 / 0.15)', fontSize: '10px', fontWeight: 'bold', padding: '16px' }}
+                                      formatter={(value: any) => [`$${value.toLocaleString()}`, 'Recaudado']}
+                                    />
+                                    <Area type="monotone" dataKey="total" stroke="#6366f1" strokeWidth={3} fillOpacity={1} fill="url(#colorTotalRec)" />
+                                  </AreaChart>
+                                </ResponsiveContainer>
+                              </div>
+                            </div>
+
+                            <div className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-xl hover:shadow-slate-200/50 transition-all duration-500 space-y-6">
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <h4 className="text-[10px] font-black text-slate-800 uppercase tracking-[0.2em]">Top Conductores</h4>
+                                  <p className="text-[8px] text-slate-400 font-bold uppercase mt-0.5">Mayores contribuyentes al flujo</p>
+                                </div>
+                                <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-500 flex items-center justify-center">
+                                  <Star size={14} />
+                                </div>
+                              </div>
+                              <div className="space-y-3">
+                                {rechargesStats.topDrivers.map((d: any, idx: number) => (
+                                  <div key={`top-recharge-driver-${d.id || d.name || idx}-${idx}`} className="flex items-center justify-between p-3 bg-slate-50/50 rounded-2xl border border-slate-100 hover:border-indigo-100 hover:bg-white transition-all group">
+                                    <div className="flex items-center gap-3">
+                                      <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-[10px] font-black shadow-sm group-hover:rotate-6 transition-transform ${idx === 0 ? 'bg-amber-100 text-amber-600' : 'bg-white text-slate-400'}`}>
+                                        {idx + 1}
+                                      </div>
+                                      <p className="text-[11px] font-black text-slate-700">{d.name}</p>
+                                    </div>
+                                    <p className="text-[11px] font-mono font-black text-indigo-600">${d.total.toLocaleString()}</p>
+                                  </div>
+                                ))}
+                                {rechargesStats.topDrivers.length === 0 && (
+                                  <div className="h-40 flex flex-col items-center justify-center text-slate-300">
+                                    <AlertCircle size={32} strokeWidth={1} className="mb-2 opacity-50" />
+                                    <p className="text-[9px] font-black uppercase tracking-widest">Sin datos suficientes</p>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          {recargasPendientes.length > 0 && (
+                            <motion.div 
+                              initial={{ opacity: 0, y: -10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              className="bg-red-50 border border-red-100 p-4 rounded-[2rem] flex items-center gap-4 mb-2"
+                            >
+                              <div className="w-12 h-12 bg-red-500 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-red-100 animate-bounce">
+                                <PlusCircle size={24} />
+                              </div>
+                              <div className="flex-1">
+                                <p className="text-sm font-bold text-red-900">¡Atención Administrador!</p>
+                                <p className="text-[10px] text-red-600 font-medium">Tienes {recargasPendientes.length} recargas esperando tu aprobación inmediata.</p>
+                              </div>
+                            </motion.div>
+                          )}
+                          
+                          <div className="bg-white rounded-[2rem] p-1 border border-slate-100 shadow-sm flex gap-1">
+                            <button 
+                              onClick={() => {
+                                // Podríamos usar un estado interno si quisiéramos, por ahora lo manejamos con scroll o secciones
+                                document.getElementById('pendientes-section')?.scrollIntoView({ behavior: 'smooth' });
+                              }}
+                              className="flex-1 py-3 px-4 rounded-3xl text-[10px] font-bold tracking-[0.1em] uppercase transition-all bg-indigo-600 text-white shadow-lg shadow-indigo-100"
+                            >
+                              Pendientes ({recargasPendientes.length})
+                            </button>
+                            <button 
+                              onClick={() => {
+                                document.getElementById('historial-section')?.scrollIntoView({ behavior: 'smooth' });
+                              }}
+                              className="flex-1 py-3 px-4 rounded-3xl text-[10px] font-bold tracking-[0.1em] uppercase transition-all hover:bg-slate-50 text-slate-400"
+                            >
+                              Historial ({historialRecargas.length})
+                            </button>
+                          </div>
+
+                          <div id="pendientes-section" className="space-y-4 pt-4">
+                            <div className="flex items-center justify-between px-2">
+                              <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">Solicitudes de Saldo</h4>
+                              <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">{recargasPendientes.length} Pendientes</span>
+                            </div>
+                            
+                            {recargasPendientes.length > 0 ? (
+                              <div className="space-y-3">
+                                {recargasPendientes.map((recarga, rIdx) => (
+                                  <motion.div 
+                                    layout
+                                    key={`recarga-pend-${recarga.id || rIdx}-${rIdx}`} 
+                                    className="bg-white p-5 rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-md transition-all group"
+                                  >
+                                    <div className="flex justify-between items-start mb-4">
+                                      <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400 group-hover:bg-indigo-50 group-hover:text-indigo-500 transition-colors">
+                                          <UserIcon size={20} />
+                                        </div>
+                                        <div>
+                                          <p className="text-sm font-bold text-slate-800">{recarga.conductorNombre}</p>
+                                          <p className="text-[10px] text-slate-400">{new Date(recarga.fecha).toLocaleString()}</p>
+                                        </div>
+                                      </div>
+                                      <div className="text-right">
+                                        <p className="text-lg font-mono font-bold text-emerald-600">${recarga.valor.toLocaleString()}</p>
+                                        <button 
+                                          onClick={() => {
+                                            navigator.clipboard.writeText(recarga.nubankKey);
+                                            toast.success("Clave copiada al portapapeles");
+                                          }}
+                                          className="text-[9px] font-bold text-indigo-500 uppercase tracking-tighter hover:underline flex items-center gap-1 justify-end"
+                                        >
+                                          {recarga.nubankKey}
+                                          <PlusCircle size={8} />
+                                        </button>
+                                      </div>
+                                    </div>
+                                    
+                                    <div className="flex gap-2 pt-4 border-t border-slate-50">
+                                      <button 
+                                        onClick={async () => {
+                                          try {
+                                            await aprobarRecarga(recarga.id, recarga.conductorId, recarga.valor, user?.uid);
+                                            toast.success(`Recarga de ${recarga.conductorNombre} aprobada`);
+                                          } catch (error) {
+                                            toast.error("Error al aprobar recarga");
+                                          }
+                                        }}
+                                        className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white text-[10px] font-bold py-3 rounded-xl shadow-lg shadow-emerald-100 transition-all active:scale-95 flex items-center justify-center gap-2"
+                                      >
+                                        <Check size={14} />
+                                        APROBAR RECARGA
+                                      </button>
+                                      <button 
+                                        onClick={async () => {
+                                          try {
+                                            await rechazarRecarga(recarga.id, user?.uid);
+                                            toast.info(`Recarga de ${recarga.conductorNombre} rechazada`);
+                                          } catch (error) {
+                                            toast.error("Error al rechazar recarga");
+                                          }
+                                        }}
+                                        className="w-12 bg-slate-100 hover:bg-red-50 text-slate-400 hover:text-red-500 rounded-xl transition-all flex items-center justify-center border border-slate-200"
+                                        title="Rechazar"
+                                      >
+                                        <X size={18} />
+                                      </button>
+                                    </div>
+
+                                  </motion.div>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="py-12 text-center bg-slate-50 rounded-[2.5rem] border border-dashed border-slate-200 space-y-3">
+                                <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center mx-auto text-slate-200 shadow-sm">
+                                  <CreditCard size={24} />
+                                </div>
+                                <p className="text-xs text-slate-400 font-medium">No hay recargas esperando aprobación</p>
+                              </div>
+                            )}
+                          </div>
+
+                          <div id="historial-section" className="space-y-4 pt-8 pb-12">
+                            <div className="flex items-center justify-between px-2">
+                              <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">Historial Reciente</h4>
+                              <Clock size={14} className="text-slate-300" />
+                            </div>
+
+                            <div className="space-y-2">
+                              {historialRecargas.filter(r => r.estado !== 'pendiente').map((recarga, rIdx) => (
+                                <motion.div 
+                                  initial={{ opacity: 0 }}
+                                  animate={{ opacity: 1 }}
+                                  key={`recarga-hist-${recarga.id || rIdx}-${rIdx}`} 
+                                  className="bg-white p-4 rounded-3xl border border-slate-100 flex items-center justify-between group"
+                                >
+                                  <div className="flex items-center gap-3">
+                                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${
+                                      recarga.tipo === 'manual' ? 'bg-amber-50 text-amber-500' :
+                                      recarga.tipo === 'ajuste_saldo_usuario' ? 'bg-indigo-50 text-indigo-500' :
+                                      recarga.estado === 'aprobada' ? 'bg-emerald-50 text-emerald-500' : 'bg-red-50 text-red-500'
+                                    }`}>
+                                      {recarga.tipo === 'manual' ? <PlusCircle size={16} /> :
+                                       recarga.tipo === 'ajuste_saldo_usuario' ? <Star size={16} /> :
+                                       recarga.estado === 'aprobada' ? <Check size={16} /> : <X size={16} />}
+                                    </div>
+                                    <div>
+                                      <p className="text-[11px] font-bold text-slate-700">
+                                        {recarga.conductorNombre || recarga.usuarioNombre || 'Sistema'}
+                                      </p>
+                                      <div className="flex items-center gap-2">
+                                        <p className="text-[9px] text-slate-400">{new Date(recarga.fecha).toLocaleString([], { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })}</p>
+                                        <span className="text-[8px] font-black uppercase tracking-tighter opacity-40">•</span>
+                                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">
+                                          {recarga.tipo === 'manual' ? 'Recarga Manual' :
+                                           recarga.tipo === 'ajuste_saldo_usuario' ? 'Ajuste Usuario' :
+                                           recarga.estado === 'aprobada' ? 'Aprobada' : 'Rechazada'}
+                                        </p>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="text-right">
+                                    <p className={`text-sm font-mono font-bold ${
+                                      recarga.estado === 'aprobada' ? 'text-emerald-500' : 'text-slate-300'
+                                    }`}>
+                                      ${recarga.valor.toLocaleString()}
+                                    </p>
+                                    {recarga.procesadaPor && (
+                                      <p className="text-[8px] text-slate-300 uppercase font-black tracking-tighter">ID: {recarga.procesadaPor.slice(-4)}</p>
+                                    )}
+                                  </div>
+                                </motion.div>
+                              ))}
+
+                              {historialRecargas.filter(r => r.estado !== 'pendiente').length === 0 && (
+                                <div className="py-12 text-center text-slate-300 italic text-[10px]">
+                                  No hay historial disponible
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {adminSubTab === 'activacion' && (
+                        <div className="space-y-6">
+                          <AdminDriversPanel adminUid={user?.uid} onOpenModal={() => setShowActivacionModal(true)} />
+                        </div>
+                      )}
+
+                      {adminSubTab === 'conductores' && (
+                        <div className="space-y-6">
+                          {/* Banner de Solicitudes de Conductor Pendientes */}
+                          {pendingDriversCount > 0 && (
+                            <div className="bg-gradient-to-r from-amber-500/15 via-amber-50 to-emerald-50 border border-amber-300 p-4 sm:p-5 rounded-3xl flex flex-col sm:flex-row items-center justify-between gap-3 shadow-sm">
+                              <div className="flex items-center gap-3">
+                                <div className="w-12 h-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center font-bold shrink-0 shadow-md shadow-amber-500/20">
+                                  <UserCheck size={22} className="animate-pulse" />
+                                </div>
+                                <div>
+                                  <p className="text-xs sm:text-sm font-black text-amber-950 uppercase tracking-tight flex items-center gap-2">
+                                    <span>Hay {pendingDriversCount} solicitud{pendingDriversCount > 1 ? 'es' : ''} de conductor por aprobar</span>
+                                    <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping"></span>
+                                  </p>
+                                  <p className="text-[11px] sm:text-xs text-slate-600 font-medium mt-0.5">
+                                    Revisa sus documentos KYC (cédula, vehículo, teléfono) y aprueba su ingreso para activar su operación.
+                                  </p>
+                                </div>
+                              </div>
+                              <button
+                                onClick={() => setShowActivacionModal(true)}
+                                className="w-full sm:w-auto px-5 py-2.5 bg-slate-900 hover:bg-black text-white text-xs font-black rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95 shrink-0"
+                              >
+                                <Sparkles size={14} className="text-amber-400" />
+                                VALIDAR Y ACTIVAR
+                              </button>
+                            </div>
+                          )}
+
+                          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-2">
+                            <div className="space-y-1">
+                              <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">Gestión de Flota</h4>
+                              <div className="flex items-center gap-2">
+                                <span className="flex items-center gap-1.5 px-2 py-0.5 bg-emerald-50 text-emerald-600 rounded-lg text-[9px] font-bold border border-emerald-100">
+                                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                  {allDrivers.filter(d => d.activo).length} EN LÍNEA
+                                </span>
+                                <span className="px-2 py-0.5 bg-slate-50 text-slate-400 rounded-lg text-[9px] font-bold border border-slate-100">
+                                  {allDrivers.length} TOTAL
+                                </span>
+                                {pendingDriversCount > 0 && (
+                                  <span className="px-2 py-0.5 bg-amber-100 text-amber-900 rounded-lg text-[9px] font-black border border-amber-300">
+                                    {pendingDriversCount} PENDIENTES
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <button
+                                onClick={() => setShowActivacionModal(true)}
+                                className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-xs font-black transition-all shadow-md shadow-emerald-600/20 active:scale-95 cursor-pointer whitespace-nowrap"
+                                title="Abrir modal para verificar cédulas y activar conductores"
+                              >
+                                <UserCheck size={16} />
+                                <span>Activación de Conductores</span>
+                                {pendingDriversCount > 0 && (
+                                  <span className="bg-white text-emerald-800 px-2 py-0.5 rounded-full text-[10px] font-black animate-pulse">
+                                    {pendingDriversCount}
+                                  </span>
+                                )}
+                              </button>
+
+                              <div className="relative group flex-1 md:w-64">
+                                <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none text-slate-400 group-focus-within:text-indigo-500 transition-colors">
+                                  <Search size={16} />
+                                </div>
+                                <input 
+                                  type="text"
+                                  placeholder="Buscar conductor o placa..."
+                                  value={driverSearchTerm}
+                                  onChange={(e) => setDriverSearchTerm(e.target.value)}
+                                  className="w-full bg-white border border-slate-100 rounded-2xl py-2.5 pl-11 pr-4 text-xs font-medium focus:outline-none focus:ring-4 focus:ring-indigo-50/50 focus:border-indigo-200 transition-all shadow-sm"
+                                />
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="grid gap-4">
+                            {allDrivers
+                              .filter(d => 
+                                d.nombre?.toLowerCase().includes(driverSearchTerm.toLowerCase()) || 
+                                d.vehiculo?.placa?.toLowerCase().includes(driverSearchTerm.toLowerCase())
+                              )
+                              .sort((a, b) => (b.activo ? 1 : 0) - (a.activo ? 1 : 0))
+                              .map((cond, cIdx) => (
+                              <motion.div 
+                                layout
+                                key={`driver-item-${cond.id || cIdx}-${cIdx}`} 
+                                className={`bg-white p-6 rounded-[2.5rem] border shadow-sm space-y-5 transition-all group ${cond.activo ? 'border-emerald-100 ring-4 ring-emerald-50/20' : 'border-slate-100'}`}
+                              >
+                                <div className="flex justify-between items-start">
+                                  <div className="flex items-center gap-4">
+                                    <div className="relative">
+                                      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all duration-500 transform group-hover:scale-105 shadow-inner ${
+                                        cond.vehiculo?.tipo === 'taxi'
+                                          ? 'bg-yellow-50 text-yellow-600 border border-yellow-100'
+                                          : cond.activo 
+                                            ? 'bg-emerald-50 text-emerald-600' 
+                                            : 'bg-slate-50 text-slate-400'
+                                      }`}>
+                                        {cond.vehiculo?.tipo?.toLowerCase() === 'taxi' ? <Taxi size={24} /> :
+                                         cond.vehiculo?.tipo?.toLowerCase().includes('moto') ? <Bike size={24} /> : 
+                                         <Car size={24} />}
+                                      </div>
+                                      {cond.activo && (
+                                        <div className={`absolute -top-1 -right-1 w-4 h-4 border-2 border-white rounded-lg shadow-sm ${cond.en_servicio ? 'bg-amber-500' : 'bg-emerald-500'}`} />
+                                      )}
+                                    </div>
+                                    <div className="space-y-1">
+                                      <div className="flex items-center gap-2 flex-wrap">
+                                        <p className="text-base font-bold text-slate-800">{cond.nombre}</p>
+                                        <div className="flex gap-1 items-center flex-wrap">
+                                          {(() => {
+                                            const matchingUser = allUsers.find(u => u.id === cond.id);
+                                            if (matchingUser?.rol === 'ambos') {
+                                              return (
+                                                <span className="text-[8px] font-black bg-amber-500/10 text-amber-600 border border-amber-500/20 px-2 py-0.5 rounded-full uppercase tracking-tighter">
+                                                  Ambos (Pasajero/Conductor)
+                                                </span>
+                                              );
+                                            } else if (matchingUser?.rol === 'conductor') {
+                                              return (
+                                                <span className="text-[8px] font-black bg-indigo-500/10 text-indigo-600 border border-indigo-500/20 px-2 py-0.5 rounded-full uppercase tracking-tighter">
+                                                  Solo Conductor
+                                                </span>
+                                              );
+                                            } else if (matchingUser?.rol === 'admin' || matchingUser?.rol === 'admin_suplente') {
+                                              return (
+                                                <span className="text-[8px] font-black bg-purple-500/10 text-purple-600 border border-purple-500/20 px-2 py-0.5 rounded-full uppercase tracking-tighter">
+                                                  Admin Conductor
+                                                </span>
+                                              );
+                                            } else {
+                                              return (
+                                                <span className="text-[8px] font-black bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 px-2 py-0.5 rounded-full uppercase tracking-tighter">
+                                                  Conductor
+                                                </span>
+                                              );
+                                            }
+                                          })()}
+
+                                          {cond.aprobado === false && (
+                                            <span className="text-[8px] font-black bg-amber-500 text-white px-2 py-0.5 rounded-full uppercase tracking-tighter shadow-sm shadow-amber-100">Esperando Verificación</span>
+                                          )}
+                                          {cond.bloqueado ? (
+                                            <AdminDriverBlockBadge cond={cond} />
+                                          ) : cond.activo ? (
+                                            <>
+                                              <span className="text-[8px] font-black bg-emerald-500 text-white px-2 py-0.5 rounded-full uppercase tracking-tighter shadow-sm shadow-emerald-100">En Línea</span>
+                                              {cond.en_servicio ? (
+                                                <span className="text-[8px] font-black bg-amber-500 text-white px-2 py-0.5 rounded-full uppercase tracking-tighter shadow-sm shadow-amber-100 animate-pulse">En Ruta</span>
+                                              ) : (
+                                                <span className="text-[8px] font-black bg-indigo-500 text-white px-2 py-0.5 rounded-full uppercase tracking-tighter shadow-sm shadow-indigo-100">Esperando</span>
+                                              )}
+                                            </>
+                                          ) : (
+                                            <span className="text-[8px] font-black bg-slate-200 text-slate-500 px-2 py-0.5 rounded-full uppercase tracking-tighter">Desconectado</span>
+                                          )}
+                                        </div>
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        <p className="text-[10px] text-slate-500 font-bold tracking-tighter bg-slate-50 px-2 py-0.5 rounded-md border border-slate-100">{cond.vehiculo?.placa}</p>
+                                        <span className="text-[10px] text-slate-400 font-medium">•</span>
+                                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter flex items-center gap-1">
+                                          {cond.vehiculo?.tipo?.toLowerCase() === 'taxi' ? 'Taxi' :
+                                           cond.vehiculo?.tipo?.toLowerCase().includes('moto') ? 'Motocicleta' : 
+                                           ['camion_flete', 'camion_acarreo', 'motocarro'].includes(cond.vehiculo?.tipo) ? 'Carga' :
+                                           'Automóvil'}
+                                        </p>
+                                        <span className="text-[10px] text-slate-400 font-medium">•</span>
+                                        <p className="text-[10px] text-indigo-500 font-bold uppercase tracking-tighter flex items-center gap-1">
+                                          <MapPin size={10} />
+                                          {cond.ciudad || 'N/A'}
+                                        </p>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="text-right">
+                                    <p className="text-lg font-mono font-bold text-emerald-600">${cond.tarjeta_virtual?.toLocaleString()}</p>
+                                    <div className="flex items-center gap-0.5 text-[10px] font-bold text-amber-500 justify-end mt-1">
+                                      <Star size={12} fill="currentColor" />
+                                      {cond.calificacion?.toFixed(1) || '5.0'}
+                                      <span className="text-slate-300 ml-1 text-[9px] font-medium opacity-50">({cond.servicios_completados || 0})</span>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 sm:col-span-1">
+                                    <p className="text-[9px] uppercase font-bold text-slate-400 mb-3 tracking-[0.1em]">Documentos</p>
+                                    <div className="flex gap-1.5 flex-wrap">
+                                      {['licencia', 'soat', 'cedula'].map((docType, dIdx) => (
+                                        <button
+                                          key={`doc-type-${cond.id || cIdx}-${docType}-${dIdx}`}
+                                          onClick={() => {
+                                            const newDocs = { ...cond.documentos_autorizados, [docType]: !cond.documentos_autorizados?.[docType] };
+                                            updateDoc(doc(db, 'conductores', cond.id), { documentos_autorizados: newDocs });
+                                            toast.info(`${docType.toUpperCase()} actualizado`);
+                                          }}
+                                          className={`px-2 py-1 rounded-lg text-[8px] font-bold uppercase transition-all ${cond.documentos_autorizados?.[docType] ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-100/50' : 'bg-white text-slate-400 border border-slate-200'}`}
+                                        >
+                                          {docType}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </div>
+                                  
+                                  <div className="sm:col-span-3 flex gap-2">
+                                    <button 
+                                      onClick={() => {
+                                        setAdminMessageTarget({ id: cond.id, nombre: cond.nombre, type: 'conductor' });
+                                        setShowAdminMessageModal(true);
+                                      }}
+                                      className="flex-1 bg-white hover:bg-slate-50 text-slate-500 text-[10px] font-bold rounded-2xl border border-slate-200 transition-all active:scale-95 flex flex-col items-center justify-center gap-1.5"
+                                    >
+                                      <MessageCircle size={18} className="text-indigo-400" />
+                                      MENSAJE
+                                    </button>
+                                    <button 
+                                      onClick={() => {
+                                        const phone = cleanPhone(cond.telefono || cond.celular);
+                                        if (phone) {
+                                          window.open(`https://wa.me/${phone}?text=Hola+${encodeURIComponent(cond.nombre || '')},+te+escribo+de+Ruedas+Rápidas.`, '_blank');
+                                        } else {
+                                          toast.error(`No hay un número de WhatsApp o celular registrado para ${cond.nombre || 'este conductor'}`);
+                                        }
+                                      }}
+                                      className="flex-1 bg-white hover:bg-emerald-50 text-emerald-600 text-[10px] font-bold rounded-2xl border border-slate-200 transition-all active:scale-95 flex flex-col items-center justify-center gap-1.5"
+                                    >
+                                      <MessageCircle size={18} />
+                                      WHATSAPP
+                                    </button>
+                                    <button 
+                                      onClick={() => {
+                                        setAdminActionType('edit_saldo_conductor');
+                                        setAdminActionTarget(cond);
+                                        setAdminActionValue(String(cond.tarjeta_virtual || 0));
+                                        setShowAdminActionModal(true);
+                                      }}
+                                      className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-bold rounded-2xl shadow-lg shadow-indigo-100 transition-all active:scale-95 flex flex-col items-center justify-center gap-1.5 border border-indigo-500"
+                                    >
+                                      <CreditCard size={18} />
+                                      SALDO
+                                    </button>
+                                    <button 
+                                      onClick={() => {
+                                        setAdminActionType('confirm_bloqueo_conductor');
+                                        setAdminActionTarget(cond);
+                                        setShowAdminActionModal(true);
+                                      }}
+                                      className={`flex-1 rounded-2xl transition-all active:scale-95 flex flex-col items-center justify-center gap-1.5 text-[10px] font-bold border ${cond.bloqueado ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-rose-50 text-rose-600 border-rose-100'}`}
+                                    >
+                                      {cond.bloqueado ? <Unlock size={18} /> : <Lock size={18} />}
+                                      {cond.bloqueado ? 'HABILITAR' : 'BLOQUEAR'}
+                                    </button>
+                                    <button 
+                                      onClick={() => {
+                                        abrirModalEliminar({
+                                          id: cond.id,
+                                          tipo: 'conductor',
+                                          nombre: cond.nombre || 'Conductor sin nombre',
+                                          telefono: cond.telefono || cond.celular,
+                                          motivoSugerido: cond.bloqueado 
+                                            ? 'Conductor bloqueado por spam o infracción' 
+                                            : ((cond.servicios_completados || 0) === 0 
+                                                ? 'Conductor inactivo sin viajes completados' 
+                                                : 'Depuración a criterio del administrador'),
+                                          detalles: `Placa: ${cond.vehiculo?.placa || 'N/A'} • Servicios: ${cond.servicios_completados || 0} • Saldo: $${(cond.tarjeta_virtual || 0).toLocaleString()} COP • Ciudad: ${cond.ciudad || 'N/A'}`
+                                        });
+                                      }}
+                                      className="flex-1 rounded-2xl transition-all active:scale-95 flex flex-col items-center justify-center gap-1.5 text-[10px] font-bold border border-rose-200 bg-rose-50/70 hover:bg-rose-100 text-rose-600 cursor-pointer"
+                                      title="Eliminar conductor inactivo o spam"
+                                    >
+                                      <Trash2 size={18} />
+                                      ELIMINAR
+                                    </button>
+                                  </div>
+
+                                  {/* Action Toggle - Document Verification / Approval */}
+                                  <div className="sm:col-span-3 mt-4 p-5 bg-amber-50 border border-amber-100 rounded-[2.5rem]">
+                                    <div className="flex items-center justify-between gap-4">
+                                      <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 bg-amber-100 rounded-2xl flex items-center justify-center text-amber-600 shrink-0">
+                                          <FileText size={20} />
+                                        </div>
+                                        <div>
+                                          <p className="text-[10px] font-black text-amber-600 uppercase tracking-widest">Aprobación General</p>
+                                          <p className="text-[9px] text-amber-500 font-medium">
+                                            {cond.aprobado !== false ? 'Conductor validado y aprobado' : 'Esperando verificación de documentos'}
+                                          </p>
+                                        </div>
+                                      </div>
+                                      <button 
+                                        onClick={async () => {
+                                          const newState = cond.aprobado === false ? true : false;
+                                          await updateDoc(doc(db, 'conductores', cond.id), { aprobado: newState });
+                                          toast.success(newState ? "Conductor Aprobado" : "Conductor puesto en Espera");
+                                        }}
+                                        className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase transition-all shadow-sm shrink-0 ${
+                                          cond.aprobado !== false 
+                                          ? 'bg-rose-100 text-rose-600 hover:bg-rose-200 border border-rose-200' 
+                                          : 'bg-emerald-600 text-white hover:bg-emerald-700'
+                                        }`}
+                                      >
+                                        {cond.aprobado !== false ? 'Desaprobar' : 'Validar y Aprobar'}
+                                      </button>
+                                    </div>
+                                  </div>
+
+                                  {/* Action Toggle - Expreso Authorization */}
+                                  <div className="sm:col-span-3 mt-4 p-5 bg-indigo-50 border border-indigo-100 rounded-[2.5rem] mb-2">
+                                    <div className="flex items-center justify-between">
+                                      <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 bg-indigo-100 rounded-2xl flex items-center justify-center text-indigo-600">
+                                          <ShieldCheck size={20} />
+                                        </div>
+                                        <div>
+                                          <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">Servicio Expreso</p>
+                                          <p className="text-[9px] text-indigo-400 font-medium">{cond.expreso_habilitado ? 'Habilitado para viajes expresos' : 'Autorización especial requerida'}</p>
+                                        </div>
+                                      </div>
+                                      <button 
+                                        onClick={() => {
+                                          const newState = !cond.expreso_habilitado;
+                                          updateDoc(doc(db, 'conductores', cond.id), { expreso_habilitado: newState });
+                                          toast.success(newState ? "Habilitado para Expreso" : "Habilitación revocada");
+                                        }}
+                                        className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase transition-all shadow-sm ${
+                                          cond.expreso_habilitado 
+                                          ? 'bg-rose-100 text-rose-600 hover:bg-rose-200' 
+                                          : 'bg-indigo-600 text-white hover:bg-indigo-700'
+                                        }`}
+                                      >
+                                        {cond.expreso_habilitado ? 'Revocar' : 'Habilitar'}
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+                              </motion.div>
+                            ))}
+                            
+                            {allDrivers.filter(d => 
+                                d.nombre?.toLowerCase().includes(driverSearchTerm.toLowerCase()) || 
+                                d.vehiculo?.placa?.toLowerCase().includes(driverSearchTerm.toLowerCase())
+                            ).length === 0 && (
+                              <div className="py-20 text-center bg-slate-50 rounded-[3rem] border-2 border-dashed border-slate-100 space-y-4">
+                                <div className="w-16 h-16 bg-white rounded-3xl flex items-center justify-center mx-auto text-slate-200 shadow-sm">
+                                  <Car size={32} />
+                                </div>
+                                <div className="space-y-1">
+                                  <p className="text-sm font-bold text-slate-400">No se encontraron conductores</p>
+                                  <p className="text-[10px] text-slate-300 px-8 mx-auto max-w-xs">Verifica placa o nombre.</p>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {adminSubTab === 'usuarios' && (
+                        <div className="space-y-6">
+                          {unattendedTrips.length > 0 && (
+                            <motion.div 
+                              initial={{ opacity: 0, y: -20 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              className="bg-rose-50 border border-rose-100 p-4 rounded-[2rem] flex items-center gap-3 shadow-sm"
+                            >
+                              <div className="w-10 h-10 bg-rose-500 text-white rounded-xl flex items-center justify-center animate-pulse">
+                                <AlertTriangle size={20} />
+                              </div>
+                              <div>
+                                <p className="text-sm font-bold text-rose-800">{unattendedTrips.length} servicios sin atender</p>
+                                <p className="text-[10px] text-rose-600 font-medium">Hay solicitudes pendientes hace más de 5 minutos.</p>
+                              </div>
+                              <button 
+                                onClick={() => setAdminSubTab('espera')}
+                                className="ml-auto bg-rose-500 text-white text-[10px] font-bold px-4 py-2 rounded-xl cursor-pointer"
+                              >
+                                VER TODOS
+                              </button>
+                            </motion.div>
+                          )}
+
+                          <AdminUsersModule
+                            allUsers={allUsers}
+                            currentAdminUid={user?.uid}
+                            onAssignBonus={(u) => {
+                              setAdminActionType('edit_saldo_usuario');
+                              setAdminActionTarget(u);
+                              setAdminActionValue(u.saldo_promo ? String(u.saldo_promo) : '10000');
+                              setShowAdminActionModal(true);
+                            }}
+                            onSendMessage={(u) => {
+                              setAdminMessageTarget({ id: u.id, nombre: u.nombre, type: 'usuario' });
+                              setShowAdminMessageModal(true);
+                            }}
+                            onViewHistory={(u) => {
+                              toast.info('Historial de servicios para ' + (u.nombre || 'usuario'));
+                              setAdminSubTab('historial');
+                            }}
+                            onToggleBlock={(u) => {
+                              setAdminActionType('confirm_bloqueo_usuario');
+                              setAdminActionTarget(u);
+                              setShowAdminActionModal(true);
+                            }}
+                            onToggleSuplente={(u) => {
+                              setAdminActionType('toggle_suplente');
+                              setAdminActionTarget(u);
+                              setShowAdminActionModal(true);
+                            }}
+                            onConvertToDriver={async (u) => {
+                              try {
+                                await updateDoc(doc(db, 'usuarios', u.id), {
+                                  rol: 'conductor',
+                                  activo: true,
+                                  aprobado: true,
+                                  updatedAt: new Date().toISOString()
+                                });
+                                try {
+                                  await updateDoc(doc(db, 'users', u.id), {
+                                    rol: 'conductor',
+                                    status: 'aprobado'
+                                  });
+                                } catch (e) {}
+                                toast.success('¡' + (u.nombre || 'El usuario') + ' ahora es conductor! Registro actualizado.');
+                              } catch (err) {
+                                toast.error('Error al convertir usuario a conductor');
+                              }
+                            }}
+                            onDeleteUser={(u) => {
+                              abrirModalEliminar({
+                                id: u.id,
+                                tipo: 'usuario',
+                                nombre: u.nombre || 'Usuario sin nombre',
+                                email: u.email,
+                                telefono: u.celular || u.telefono,
+                                motivoSugerido: u.bloqueado 
+                                  ? 'Usuario bloqueado por spam o reporte' 
+                                  : (((u.servicios_count || 0) === 0 && (u.servicios_perdidos || 0) === 0) 
+                                      ? 'Usuario inactivo (0 viajes registrados)' 
+                                      : 'Depuración a criterio del administrador'),
+                                detalles: 'Email: ' + (u.email || 'N/A') + ' • Viajes: ' + (u.servicios_count || 0) + ' • Bono: $' + ((u.saldo_promo || 0).toLocaleString()) + ' COP • Ciudad: ' + (u.ciudad || 'N/A')
+                              });
+                            }}
+                          />
+                        </div>
+                      )}
+
+                      {adminSubTab === 'soporte' && (
+                        <div className="space-y-4">
+                          <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] px-2">Chats de Soporte</h4>
+                          <div className="space-y-3">
+                            {supportChats.length === 0 ? (
+                              <div className="bg-white p-10 rounded-[2.5rem] border border-slate-100 text-center space-y-3">
+                                <div className="w-16 h-16 bg-slate-50 rounded-3xl flex items-center justify-center mx-auto text-slate-300">
+                                  <Headphones size={32} />
+                                </div>
+                                <p className="text-sm font-bold text-slate-400">No hay chats de soporte activos</p>
+                              </div>
+                            ) : (
+                              supportChats.map((chat, cIdx) => (
+                                <button 
+                                  key={`support-chat-${chat.conductorId || cIdx}-${cIdx}`}
+                                  onClick={() => {
+                                    setActiveSupportConductor({ id: chat.conductorId, nombre: chat.conductorNombre });
+                                    setShowSupportChat(true);
+                                  }}
+                                  className="w-full bg-white p-5 rounded-[2rem] border border-slate-100 shadow-sm flex items-center justify-between hover:border-blue-200 transition-all group text-left"
+                                >
+                                  <div className="flex items-center gap-4">
+                                    <div className="relative">
+                                      <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600 font-bold text-lg">
+                                        {(chat.conductorNombre || "?").charAt(0)}
+                                      </div>
+                                      {!chat.leidoPorAdmin && (
+                                        <span className="absolute -top-1 -right-1 w-4 h-4 bg-blue-600 border-2 border-white rounded-full animate-pulse" />
+                                      )}
+                                    </div>
+                                    <div>
+                                      <h5 className="text-sm font-bold text-slate-800">{chat.conductorNombre}</h5>
+                                      <p className="text-[10px] text-slate-400 font-medium truncate max-w-[150px]">{chat.ultimaMensaje}</p>
+                                    </div>
+                                  </div>
+                                  <div className="text-right space-y-1">
+                                    <p className="text-[9px] font-bold text-slate-400 uppercase">
+                                      {chat.ultimaFecha?.toDate ? new Date(chat.ultimaFecha.toDate()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '...'}
+                                    </p>
+                                    <div className="flex items-center gap-1.5 justify-end">
+                                      {!chat.leidoPorAdmin && (
+                                        <span className="text-[7px] font-black bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-md uppercase">Nuevo</span>
+                                      )}
+                                      <ChevronRight size={14} className="text-slate-300 group-hover:text-blue-500 transition-colors" />
+                                    </div>
+                                  </div>
+                                </button>
+                              ))
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {adminSubTab === 'aliados' && (
+                        <div className="space-y-6">
+                          {/* KPI & Moderation Ribbon */}
+                          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                            <button
+                              onClick={() => setAdminAliadosFilter('pendientes')}
+                              className={`p-4 rounded-3xl border text-left transition-all relative overflow-hidden group cursor-pointer ${
+                                adminAliadosFilter === 'pendientes'
+                                  ? 'bg-amber-500 text-white border-amber-600 shadow-lg shadow-amber-500/20'
+                                  : 'bg-white text-slate-700 border-slate-100 hover:border-amber-200 shadow-sm'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between mb-2">
+                                <span className={`text-[9px] font-black uppercase tracking-wider ${adminAliadosFilter === 'pendientes' ? 'text-amber-100' : 'text-amber-600'}`}>
+                                  En Espera Anti-Spam
+                                </span>
+                                <div className={`w-7 h-7 rounded-xl flex items-center justify-center ${adminAliadosFilter === 'pendientes' ? 'bg-white/20 text-white' : 'bg-amber-50 text-amber-500'}`}>
+                                  <Clock size={14} className={marcasAliadas.filter(isMarcaPendiente).length > 0 ? "animate-spin" : ""} />
+                                </div>
+                              </div>
+                              <div className="flex items-baseline gap-2">
+                                <p className="text-2xl font-mono font-black">
+                                  {marcasAliadas.filter(isMarcaPendiente).length}
+                                </p>
+                                {marcasAliadas.filter(isMarcaPendiente).length > 0 && (
+                                  <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded-full ${adminAliadosFilter === 'pendientes' ? 'bg-white text-amber-600' : 'bg-amber-100 text-amber-700'}`}>
+                                    ¡Por Revisar!
+                                  </span>
+                                )}
+                              </div>
+                            </button>
+
+                            <button
+                              onClick={() => setAdminAliadosFilter('aprobados')}
+                              className={`p-4 rounded-3xl border text-left transition-all relative overflow-hidden group cursor-pointer ${
+                                adminAliadosFilter === 'aprobados'
+                                  ? 'bg-emerald-600 text-white border-emerald-700 shadow-lg shadow-emerald-600/20'
+                                  : 'bg-white text-slate-700 border-slate-100 hover:border-emerald-200 shadow-sm'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between mb-2">
+                                <span className={`text-[9px] font-black uppercase tracking-wider ${adminAliadosFilter === 'aprobados' ? 'text-emerald-100' : 'text-emerald-600'}`}>
+                                  Aprobadas y Activas
+                                </span>
+                                <div className={`w-7 h-7 rounded-xl flex items-center justify-center ${adminAliadosFilter === 'aprobados' ? 'bg-white/20 text-white' : 'bg-emerald-50 text-emerald-500'}`}>
+                                  <CheckCheck size={14} />
+                                </div>
+                              </div>
+                              <p className="text-2xl font-mono font-black">
+                                {marcasAliadas.filter(isMarcaAprobada).length}
+                              </p>
+                            </button>
+
+                            <button
+                              onClick={() => setAdminAliadosFilter('rechazados')}
+                              className={`p-4 rounded-3xl border text-left transition-all relative overflow-hidden group cursor-pointer ${
+                                adminAliadosFilter === 'rechazados'
+                                  ? 'bg-rose-600 text-white border-rose-700 shadow-lg shadow-rose-600/20'
+                                  : 'bg-white text-slate-700 border-slate-100 hover:border-rose-200 shadow-sm'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between mb-2">
+                                <span className={`text-[9px] font-black uppercase tracking-wider ${adminAliadosFilter === 'rechazados' ? 'text-rose-100' : 'text-rose-600'}`}>
+                                  Rechazadas / Spam
+                                </span>
+                                <div className={`w-7 h-7 rounded-xl flex items-center justify-center ${adminAliadosFilter === 'rechazados' ? 'bg-white/20 text-white' : 'bg-rose-50 text-rose-500'}`}>
+                                  <Ban size={14} />
+                                </div>
+                              </div>
+                              <p className="text-2xl font-mono font-black">
+                                {marcasAliadas.filter(isMarcaRechazada).length}
+                              </p>
+                            </button>
+
+                            <button
+                              onClick={() => setAdminAliadosFilter('todos')}
+                              className={`p-4 rounded-3xl border text-left transition-all relative overflow-hidden group cursor-pointer ${
+                                adminAliadosFilter === 'todos'
+                                  ? 'bg-indigo-600 text-white border-indigo-700 shadow-lg shadow-indigo-600/20'
+                                  : 'bg-white text-slate-700 border-slate-100 hover:border-indigo-200 shadow-sm'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between mb-2">
+                                <span className={`text-[9px] font-black uppercase tracking-wider ${adminAliadosFilter === 'todos' ? 'text-indigo-100' : 'text-indigo-600'}`}>
+                                  Total Comercios
+                                </span>
+                                <div className={`w-7 h-7 rounded-xl flex items-center justify-center ${adminAliadosFilter === 'todos' ? 'bg-white/20 text-white' : 'bg-indigo-50 text-indigo-500'}`}>
+                                  <Store size={14} />
+                                </div>
+                              </div>
+                              <p className="text-2xl font-mono font-black">
+                                {marcasAliadas.length}
+                              </p>
+                            </button>
+                          </div>
+
+                          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                            {/* Formulario Registro Directo Admin */}
+                            <div className="lg:col-span-4 bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-4">
+                              <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
+                                <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600">
+                                  <Store size={18} />
+                                </div>
+                                <div>
+                                  <h4 className="text-sm font-bold text-slate-800">
+                                    {editingMarcaId ? 'Editar Marca Aliada' : 'Crear Marca Verificada'}
+                                  </h4>
+                                  <p className="text-[10px] text-slate-400 font-medium">Registro directo aprobado por Administración</p>
+                                </div>
+                              </div>
+
+                              <form onSubmit={guardarMarcaAliada} className="space-y-3.5">
+                                <div>
+                                  <label className="text-[10px] uppercase font-black text-slate-500 ml-1">Nombre Comercial</label>
+                                  <input 
+                                    required
+                                    type="text" 
+                                    placeholder="Ej: Restaurante El Sabor Real"
+                                    className="w-full bg-slate-50 border border-slate-100 rounded-xl p-3 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                    value={nuevaMarcaNombre}
+                                    onChange={e => setNuevaMarcaNombre(e.target.value)}
+                                  />
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-3">
+                                  <div>
+                                    <label className="text-[10px] uppercase font-black text-slate-500 ml-1">Categoría</label>
+                                    <select 
+                                      className="w-full bg-slate-50 border border-slate-100 rounded-xl p-2.5 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none hover:bg-slate-100/50 cursor-pointer"
+                                      value={nuevaMarcaCategoria}
+                                      onChange={e => setNuevaMarcaCategoria(e.target.value)}
+                                    >
+                                      <option value="Restaurante">🍔 Restaurante</option>
+                                      <option value="Droguería">💊 Droguería</option>
+                                      <option value="Ferretería">🔨 Ferretería</option>
+                                      <option value="Supermercado">🛒 Supermercado</option>
+                                      <option value="Tecnología">💻 Tecnología</option>
+                                      <option value="Moda">👗 Moda y Calzado</option>
+                                      <option value="Mascotas">🐾 Mascotas</option>
+                                      <option value="Otro">📦 Otro Negocio</option>
+                                    </select>
+                                  </div>
+
+                                  <div>
+                                    <label className="text-[10px] uppercase font-black text-slate-500 ml-1">WhatsApp</label>
+                                    <input 
+                                      required
+                                      type="tel" 
+                                      placeholder="Ej: 3123456789"
+                                      className="w-full bg-slate-50 border border-slate-100 rounded-xl p-2.5 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none font-mono"
+                                      value={nuevaMarcaWhatsapp}
+                                      onChange={e => setNuevaMarcaWhatsapp(e.target.value)}
+                                    />
+                                  </div>
+                                </div>
+
+                                <div>
+                                  <label className="text-[10px] uppercase font-black text-slate-500 ml-1">Ciudad de Cobertura</label>
+                                  <input 
+                                    required
+                                    type="text" 
+                                    placeholder="Ej: Fusagasugá"
+                                    className="w-full bg-slate-50 border border-slate-100 rounded-xl p-2.5 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                    value={nuevaMarcaCiudad}
+                                    onChange={e => setNuevaMarcaCiudad(e.target.value)}
+                                  />
+                                  <div className="flex flex-wrap gap-1 mt-1.5">
+                                    {['Fusagasugá', 'Bogotá', 'Girardot', 'Melgar', 'Pasca', 'Silvania', 'Arauca'].map((city, cIdx) => (
+                                      <button
+                                        key={`marca-quick-city-${city}-${cIdx}`}
+                                        type="button"
+                                        onClick={() => setNuevaMarcaCiudad(city)}
+                                        className={`text-[8px] font-bold px-2 py-0.5 rounded-md transition-colors ${nuevaMarcaCiudad.toLowerCase() === city.toLowerCase() ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                                      >
+                                        {city}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+
+                                <div>
+                                  <label className="text-[10px] uppercase font-black text-slate-500 ml-1">Dirección Física</label>
+                                  <div className="relative">
+                                    <MapPin size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-rose-500" />
+                                    <input 
+                                      required
+                                      type="text" 
+                                      placeholder="Ej: Calle 8 con Carrera 6"
+                                      className="w-full bg-slate-50 border border-slate-100 rounded-xl p-2.5 pl-9 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                      value={nuevaMarcaDireccion}
+                                      onChange={e => setNuevaMarcaDireccion(e.target.value)}
+                                    />
+                                  </div>
+                                </div>
+
+                                {/* Drag and Drop Admin Brand Logo Upload */}
+                                <div>
+                                  <label className="text-[10px] uppercase font-black text-slate-500 ml-1">Logo del Comercio (Opcional)</label>
+                                  <div 
+                                    onDragOver={(e) => {
+                                      e.preventDefault();
+                                      setAdminLogoDragActive(true);
+                                    }}
+                                    onDragLeave={() => setAdminLogoDragActive(false)}
+                                    onDrop={(e) => {
+                                      e.preventDefault();
+                                      setAdminLogoDragActive(false);
+                                      if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                                        handleLogoUpload(e.dataTransfer.files[0], setNuevaMarcaLogo);
+                                      }
+                                    }}
+                                    className={`mt-1 border-2 border-dashed rounded-2xl p-3 transition-all flex flex-col items-center justify-center gap-1.5 cursor-pointer relative overflow-hidden ${
+                                      adminLogoDragActive 
+                                        ? 'border-indigo-500 bg-indigo-50/50' 
+                                        : nuevaMarcaLogo 
+                                          ? 'border-emerald-300 bg-emerald-50/10' 
+                                          : 'border-slate-200 bg-slate-50/50 hover:bg-slate-50 hover:border-slate-300'
+                                    }`}
+                                  >
+                                    <input 
+                                      type="file" 
+                                      accept="image/*"
+                                      onChange={(e) => {
+                                        if (e.target.files && e.target.files[0]) {
+                                          handleLogoUpload(e.target.files[0], setNuevaMarcaLogo);
+                                        }
+                                      }}
+                                      className="absolute inset-0 opacity-0 cursor-pointer z-10"
+                                    />
+                                    {nuevaMarcaLogo ? (
+                                      <div className="flex flex-col items-center gap-1.5 text-center">
+                                        <img 
+                                          src={nuevaMarcaLogo} 
+                                          alt="Logo previsualización" 
+                                          className="w-12 h-12 rounded-xl object-cover border border-slate-100 shadow-sm"
+                                          referrerPolicy="no-referrer"
+                                        />
+                                        <div className="space-y-0.5">
+                                          <p className="text-[9px] font-black text-emerald-600 uppercase tracking-wider flex items-center gap-1 justify-center">
+                                            <Check size={11} /> ¡Logo cargado!
+                                          </p>
+                                          <button 
+                                            type="button"
+                                            onClick={(e) => {
+                                              e.preventDefault();
+                                              e.stopPropagation();
+                                              setNuevaMarcaLogo('');
+                                            }}
+                                            className="text-[8px] text-rose-500 hover:text-rose-700 font-bold uppercase tracking-wider underline relative z-20 cursor-pointer"
+                                          >
+                                            Eliminar
+                                          </button>
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <div className="flex flex-col items-center gap-1 text-center py-1">
+                                        <div className="w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center text-slate-400">
+                                          <Upload size={14} />
+                                        </div>
+                                        <div className="space-y-0.5">
+                                          <p className="text-[9px] font-black text-slate-700 leading-tight">
+                                            Sube el logo o <span className="text-indigo-600 underline">busca archivo</span>
+                                          </p>
+                                          <p className="text-[7.5px] text-slate-400">PNG o JPG (Max 2MB)</p>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+
+                                <div className="flex gap-2 pt-2">
+                                  <button
+                                    type="submit"
+                                    className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-black py-3 px-4 rounded-xl text-xs uppercase tracking-wider transition-colors shadow-sm flex items-center justify-center gap-1.5 cursor-pointer"
+                                  >
+                                    <Check size={15} />
+                                    {editingMarcaId ? 'Guardar Cambios' : 'Guardar y Aprobar'}
+                                  </button>
+                                  {editingMarcaId && (
+                                    <button
+                                      type="button"
+                                      onClick={cancelarEditarMarca}
+                                      className="bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-3 px-4 rounded-xl text-xs transition-colors cursor-pointer"
+                                    >
+                                      Cancelar
+                                    </button>
+                                  )}
+                                </div>
+                              </form>
+                            </div>
+
+                            {/* Panel de Moderación y Catálogo de Aliados */}
+                            <div className="lg:col-span-8 space-y-4">
+                              {/* Search and Filters Bar */}
+                              <div className="bg-white p-4 rounded-3xl border border-slate-100 shadow-sm space-y-3">
+                                <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+                                  <div className="relative w-full sm:w-72">
+                                    <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                    <input 
+                                      type="text" 
+                                      placeholder="Buscar comercio, creador, ciudad..."
+                                      className="w-full bg-slate-50 border border-slate-100 rounded-xl py-2 pr-3 pl-9 text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500"
+                                      value={adminAliadosSearch}
+                                      onChange={e => setAdminAliadosSearch(e.target.value)}
+                                    />
+                                    {adminAliadosSearch && (
+                                      <button 
+                                        onClick={() => setAdminAliadosSearch('')}
+                                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                                      >
+                                        <X size={13} />
+                                      </button>
+                                    )}
+                                  </div>
+
+                                  <div className="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto pb-1 sm:pb-0">
+                                    {[
+                                      { id: 'pendientes', label: 'En Espera', count: marcasAliadas.filter(isMarcaPendiente).length, color: 'amber' },
+                                      { id: 'aprobados', label: 'Aprobadas', count: marcasAliadas.filter(isMarcaAprobada).length, color: 'emerald' },
+                                      { id: 'rechazados', label: 'Rechazadas', count: marcasAliadas.filter(isMarcaRechazada).length, color: 'rose' },
+                                      { id: 'todos', label: 'Todas', count: marcasAliadas.length, color: 'slate' }
+                                    ].map((tab, tIdx) => (
+                                      <button
+                                        key={`admin-aliados-filter-${tab.id}-${tIdx}`}
+                                        onClick={() => setAdminAliadosFilter(tab.id as any)}
+                                        className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+                                          adminAliadosFilter === tab.id
+                                            ? 'bg-slate-900 text-white shadow-sm'
+                                            : 'bg-slate-50 text-slate-500 hover:bg-slate-100 hover:text-slate-800'
+                                        }`}
+                                      >
+                                        <span>{tab.label}</span>
+                                        <span className={`px-1.5 py-0.2 rounded-md text-[9px] ${
+                                          adminAliadosFilter === tab.id 
+                                            ? 'bg-white/20 text-white' 
+                                            : tab.id === 'pendientes' && tab.count > 0 
+                                              ? 'bg-amber-100 text-amber-700 font-black' 
+                                              : 'bg-slate-200 text-slate-600'
+                                        }`}>
+                                          {tab.count}
+                                        </span>
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Listado de Marcas según Filtro */}
+                              {(() => {
+                                const filtered = marcasAliadas.filter(marca => {
+                                  // Moderation filter
+                                  if (adminAliadosFilter === 'pendientes' && !isMarcaPendiente(marca)) return false;
+                                  if (adminAliadosFilter === 'aprobados' && !isMarcaAprobada(marca)) return false;
+                                  if (adminAliadosFilter === 'rechazados' && !isMarcaRechazada(marca)) return false;
+
+                                  // Search filter
+                                  if (adminAliadosSearch.trim()) {
+                                    const q = adminAliadosSearch.toLowerCase().trim();
+                                    const matchNom = marca.nombre?.toLowerCase().includes(q);
+                                    const matchDir = marca.direccion?.toLowerCase().includes(q);
+                                    const matchCiu = marca.ciudad?.toLowerCase().includes(q);
+                                    const matchTel = marca.whatsapp?.toLowerCase().includes(q);
+                                    const matchCat = marca.categoria?.toLowerCase().includes(q);
+                                    const matchCreador = marca.creadorNombre?.toLowerCase().includes(q) || marca.creadorEmail?.toLowerCase().includes(q);
+                                    return matchNom || matchDir || matchCiu || matchTel || matchCat || matchCreador;
+                                  }
+                                  return true;
+                                });
+
+                                if (filtered.length === 0) {
+                                  return (
+                                    <div className="bg-white p-12 rounded-3xl border border-slate-100 text-center space-y-3 shadow-sm">
+                                      <div className="w-14 h-14 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto text-slate-300">
+                                        <Store size={26} />
+                                      </div>
+                                      <div>
+                                        <h5 className="text-sm font-bold text-slate-700">No hay comercios en esta vista</h5>
+                                        <p className="text-xs text-slate-400">
+                                          {adminAliadosFilter === 'pendientes' 
+                                            ? '¡Excelente! No hay marcas aliadas pendientes de validación anti-spam.' 
+                                            : 'No se encontraron registros con los filtros seleccionados.'}
+                                        </p>
+                                      </div>
+                                    </div>
+                                  );
+                                }
+
+                                return (
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[75vh] overflow-y-auto pr-1">
+                                    {filtered.map((marca, mIdx) => {
+                                      const isPend = isMarcaPendiente(marca);
+                                      const isAprob = isMarcaAprobada(marca);
+                                      const isRech = isMarcaRechazada(marca);
+
+                                      let catBg = 'bg-orange-50 text-orange-600 border-orange-100';
+                                      if (marca.categoria === 'Droguería') catBg = 'bg-rose-50 text-rose-600 border-rose-100';
+                                      if (marca.categoria === 'Ferretería') catBg = 'bg-amber-50 text-amber-600 border-amber-100';
+                                      if (marca.categoria === 'Supermercado') catBg = 'bg-emerald-50 text-emerald-600 border-emerald-100';
+                                      if (marca.categoria === 'Tecnología') catBg = 'bg-blue-50 text-blue-600 border-blue-100';
+                                      if (marca.categoria === 'Moda') catBg = 'bg-purple-50 text-purple-600 border-purple-100';
+
+                                      const waClean = (marca.whatsapp || '').replace(/\D/g, '');
+                                      const waLink = `https://wa.me/57${waClean}?text=${encodeURIComponent(`Hola ${marca.nombre}, te contactamos de la administración de Ruedas Rápidas para validar el registro de tu comercio en la red.`)}`;
+
+                                      return (
+                                        <div 
+                                          key={`marca-admin-${marca.id || mIdx}-${mIdx}`} 
+                                          className={`p-4.5 rounded-3xl bg-white border transition-all flex flex-col justify-between relative shadow-sm hover:shadow-md ${
+                                            isPend 
+                                              ? 'border-amber-300 ring-4 ring-amber-500/5' 
+                                              : isRech 
+                                                ? 'border-rose-200 bg-rose-50/10' 
+                                                : 'border-slate-100 hover:border-slate-200'
+                                          }`}
+                                        >
+                                          {/* Status Header Badge */}
+                                          <div className="space-y-2.5">
+                                            <div className="flex items-center justify-between gap-2">
+                                              <div className="flex items-center gap-1.5 flex-wrap">
+                                                <span className={`text-[8.5px] font-black uppercase px-2 py-0.5 rounded-md border ${catBg}`}>
+                                                  {marca.categoria || 'Comercio'}
+                                                </span>
+                                                <span className="text-[9px] font-bold text-slate-500 uppercase bg-slate-100 px-1.5 py-0.5 rounded-md">
+                                                  {marca.ciudad}
+                                                </span>
+                                              </div>
+
+                                              {isPend && (
+                                                <span className="flex items-center gap-1 text-[8px] font-black text-amber-700 bg-amber-100 border border-amber-200 px-2 py-0.5 rounded-full uppercase tracking-wider animate-pulse">
+                                                  <Clock size={10} /> En Espera
+                                                </span>
+                                              )}
+                                              {isAprob && (
+                                                <span className="flex items-center gap-1 text-[8px] font-black text-emerald-700 bg-emerald-100 border border-emerald-200 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                                                  <CheckCheck size={10} /> Aprobado
+                                                </span>
+                                              )}
+                                              {isRech && (
+                                                <span className="flex items-center gap-1 text-[8px] font-black text-rose-700 bg-rose-100 border border-rose-200 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                                                  <Ban size={10} /> Rechazado
+                                                </span>
+                                              )}
+                                            </div>
+
+                                            {/* Brand Logo & Name */}
+                                            <div className="flex items-start gap-3">
+                                              <div className="w-12 h-12 rounded-2xl bg-slate-100 border border-slate-200/60 overflow-hidden shrink-0 flex items-center justify-center">
+                                                {marca.logo ? (
+                                                  <img src={marca.logo} alt={marca.nombre} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                                                ) : (
+                                                  <Store size={20} className="text-slate-400" />
+                                                )}
+                                              </div>
+                                              <div className="flex-1 min-w-0">
+                                                <h5 className="font-black text-sm text-slate-800 truncate leading-tight uppercase">
+                                                  {marca.nombre}
+                                                </h5>
+                                                <div className="flex items-center gap-1 text-xs text-slate-500 mt-1">
+                                                  <MapPin size={12} className="text-rose-500 shrink-0" />
+                                                  <span className="truncate text-[11px] font-medium" title={marca.direccion}>{marca.direccion}</span>
+                                                </div>
+                                              </div>
+                                            </div>
+
+                                            {/* Anti-Spam Security Card */}
+                                            <div className="bg-slate-50 p-2.5 rounded-2xl border border-slate-100/80 space-y-1.5 text-[10.5px]">
+                                              <div className="flex items-center justify-between">
+                                                <span className="text-[8px] font-black text-slate-400 uppercase tracking-wider">Solicitud / Creador</span>
+                                                <span className="text-[8px] font-bold text-slate-400">
+                                                  {marca.fechaCreacion ? new Date(marca.fechaCreacion).toLocaleDateString([], { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'Directo'}
+                                                </span>
+                                              </div>
+                                              <div className="flex items-center justify-between text-slate-700">
+                                                <span className="font-bold truncate max-w-[140px]">
+                                                  {marca.creadorNombre || marca.creadorEmail || 'Admin Directo'}
+                                                </span>
+                                                <a 
+                                                  href={waLink}
+                                                  target="_blank"
+                                                  rel="noreferrer"
+                                                  className="inline-flex items-center gap-1 text-[9px] font-black text-emerald-600 bg-emerald-50 hover:bg-emerald-100 px-2 py-0.5 rounded-lg border border-emerald-200 transition-colors"
+                                                  title="Verificar y Chatear por WhatsApp"
+                                                >
+                                                  <Zap size={10} />
+                                                  <span>{marca.whatsapp}</span>
+                                                </a>
+                                              </div>
+
+                                              {isRech && marca.motivoRechazo && (
+                                                <div className="bg-rose-50 border border-rose-100 p-1.5 rounded-xl text-[9px] text-rose-700 font-bold">
+                                                  <span className="font-black">Motivo rechazo:</span> {marca.motivoRechazo}
+                                                </div>
+                                              )}
+
+                                              {marca.oferta?.activa && (
+                                                <div className="flex items-center justify-between bg-pink-50/70 border border-pink-100 px-2 py-1 rounded-xl text-[9px] text-pink-700 font-bold">
+                                                  <span className="flex items-center gap-1">
+                                                    <span>⚡</span>
+                                                    <span className="truncate max-w-[150px]">{marca.oferta.titulo}</span>
+                                                  </span>
+                                                  <span className="font-mono font-black">${Number(marca.oferta.precioDescuento).toLocaleString()}</span>
+                                                </div>
+                                              )}
+                                            </div>
+                                          </div>
+
+                                          {/* Action Buttons */}
+                                          <div className="pt-3 border-t border-slate-100 space-y-2 mt-3">
+                                            {/* Fast Moderation Actions */}
+                                            {isPend && (
+                                              <div className="grid grid-cols-2 gap-2">
+                                                <button
+                                                  disabled={isProcessingMarcaAction === marca.id}
+                                                  onClick={() => aprobarMarcaAliada(marca.id, marca.nombre)}
+                                                  className="h-9 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black rounded-xl text-[10px] uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 shadow-sm shadow-emerald-600/20 cursor-pointer"
+                                                >
+                                                  <Check size={14} />
+                                                  {isProcessingMarcaAction === marca.id ? 'Aprobando...' : 'Aprobar'}
+                                                </button>
+
+                                                <button
+                                                  disabled={isProcessingMarcaAction === marca.id}
+                                                  onClick={() => setMarcaToRejectModal({
+                                                    isOpen: true,
+                                                    marca: marca,
+                                                    motivo: 'Teléfono de WhatsApp no válido o no responde',
+                                                    customMotivo: ''
+                                                  })}
+                                                  className="h-9 bg-rose-50 hover:bg-rose-100 text-rose-600 active:scale-95 border border-rose-200 font-black rounded-xl text-[10px] uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                                                >
+                                                  <Ban size={14} />
+                                                  Rechazar
+                                                </button>
+                                              </div>
+                                            )}
+
+                                            {isRech && (
+                                              <div className="flex gap-2">
+                                                <button
+                                                  disabled={isProcessingMarcaAction === marca.id}
+                                                  onClick={() => aprobarMarcaAliada(marca.id, marca.nombre)}
+                                                  className="flex-1 h-9 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black rounded-xl text-[10px] uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                                                >
+                                                  <Check size={14} />
+                                                  Aprobar Ahora
+                                                </button>
+                                                <button
+                                                  disabled={isProcessingMarcaAction === marca.id}
+                                                  onClick={() => reabrirRevisionMarca(marca.id, marca.nombre)}
+                                                  className="h-9 px-3 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 font-bold rounded-xl text-[10px] transition-all flex items-center justify-center gap-1 cursor-pointer"
+                                                  title="Volver a poner en espera"
+                                                >
+                                                  <RefreshCw size={12} />
+                                                  A Espera
+                                                </button>
+                                              </div>
+                                            )}
+
+                                            {isAprob && (
+                                              <div className="flex gap-2">
+                                                <button
+                                                  disabled={isProcessingMarcaAction === marca.id}
+                                                  onClick={() => reabrirRevisionMarca(marca.id, marca.nombre)}
+                                                  className="flex-1 h-8 bg-slate-100 hover:bg-amber-50 hover:text-amber-700 text-slate-600 border border-slate-200 font-black rounded-xl text-[9px] uppercase tracking-wider transition-all flex items-center justify-center gap-1 cursor-pointer"
+                                                >
+                                                  <Clock size={12} />
+                                                  Pausar / A Espera
+                                                </button>
+                                              </div>
+                                            )}
+
+                                            {/* Secondary Utilities */}
+                                            <div className="flex items-center gap-1.5 pt-1">
+                                              <button
+                                                onClick={() => setMarcaToInspectModal(marca)}
+                                                className="flex-1 bg-slate-50 hover:bg-slate-100 text-slate-600 font-bold py-1.5 rounded-lg text-[9.5px] transition-colors flex items-center justify-center gap-1 border border-slate-200/60 cursor-pointer"
+                                              >
+                                                <Eye size={12} />
+                                                Detalles
+                                              </button>
+                                              <button
+                                                onClick={() => iniciarEditarMarca(marca)}
+                                                className="flex-1 bg-slate-50 hover:bg-slate-100 text-slate-600 font-bold py-1.5 rounded-lg text-[9.5px] transition-colors flex items-center justify-center gap-1 border border-slate-200/60 cursor-pointer"
+                                              >
+                                                <Edit size={12} />
+                                                Editar
+                                              </button>
+                                              <button
+                                                onClick={() => {
+                                                  abrirModalEliminar({
+                                                    id: marca.id,
+                                                    tipo: 'aliado',
+                                                    nombre: marca.nombre || 'Comercio Aliado',
+                                                    telefono: marca.whatsapp,
+                                                    motivoSugerido: isMarcaRechazada(marca) 
+                                                      ? 'Comercio rechazado por filtros anti-spam' 
+                                                      : (!marca.whatsapp 
+                                                          ? 'Comercio sin datos de contacto' 
+                                                          : 'Depuración a criterio del administrador'),
+                                                    detalles: `Categoría: ${marca.categoria || 'N/A'} • Ciudad: ${marca.ciudad || 'N/A'} • Dirección: ${marca.direccion || 'N/A'}`
+                                                  });
+                                                }}
+                                                className="bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-100 py-1.5 px-2.5 rounded-lg text-[9.5px] font-bold transition-colors cursor-pointer"
+                                                title="Eliminar de la plataforma"
+                                              >
+                                                <Trash2 size={12} />
+                                              </button>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                );
+                              })()}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* SUBTAB: DEPURACIÓN & CONTROL ANTI-SPAM */}
+                      {adminSubTab === 'depuracion' && (
+                        <AdminDepuracionTab
+                          allUsers={allUsers}
+                          allDrivers={allDrivers}
+                          marcasAliadas={marcasAliadas}
+                          user={user}
+                          depuracionEntityType={depuracionEntityType}
+                          setDepuracionEntityType={setDepuracionEntityType}
+                          depuracionFilter={depuracionFilter}
+                          setDepuracionFilter={setDepuracionFilter}
+                          depuracionSearchTerm={depuracionSearchTerm}
+                          setDepuracionSearchTerm={setDepuracionSearchTerm}
+                          selectedDepuracionIds={selectedDepuracionIds}
+                          setSelectedDepuracionIds={setSelectedDepuracionIds}
+                          checkUserStatus={checkUserStatus}
+                          checkDriverStatus={checkDriverStatus}
+                          checkAliadoStatus={checkAliadoStatus}
+                          abrirModalEliminar={abrirModalEliminar}
+                          abrirModalEliminarLote={abrirModalEliminarLote}
+                        />
+                      )}
+
+    </div>
+  );
+
   return (
     <MapProvider>
       <ErrorBoundary>
@@ -5284,6 +7326,22 @@ export default function App() {
               </button>
             </div>
           </div>
+        ) : activeTab === 'admin' && isUserAdmin ? (
+          <AdminDesktopLayout
+            currentTab={adminSubTab}
+            onChangeTab={(tabId) => setAdminSubTab(tabId)}
+            pendingDriversCount={pendingDriversCount}
+            recargasPendientesCount={recargasPendientes.length}
+            unattendedTripsCount={unattendedTrips.length}
+            alertasCount={calificacionesBajas.length}
+            spamCount={totalSpamOInactivos}
+            onExitAdmin={() => setActiveTab('home')}
+            onExportExcel={exportarOperacionTotal}
+            userEmail={user?.email || undefined}
+            userName={perfil?.nombre || user?.displayName || undefined}
+          >
+            {renderAdminDesktopContent()}
+          </AdminDesktopLayout>
         ) : (
           <div className="max-w-md mx-auto min-h-screen flex flex-col bg-white shadow-2xl relative overflow-hidden">
             {/* Header */}
@@ -7800,2367 +9858,7 @@ export default function App() {
             )}
           </AnimatePresence>
 
-              {/* Admin Panel (if applicable) */}
-              {activeTab === 'admin' && isUserAdmin && (
-                <motion.section 
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="space-y-6 pb-12"
-                >
-                  {/* Dashboard Header */}
-                  <div className="relative overflow-hidden bg-slate-900 rounded-[2.5rem] p-8 text-white shadow-2xl">
-                    <div className="absolute top-0 right-0 p-8 opacity-10">
-                      <ShieldCheck size={120} />
-                    </div>
-                    <div className="relative z-10 space-y-6">
-                      <div className="flex justify-between items-center">
-                        <div className="flex items-center gap-3">
-                          <div className="p-2 bg-indigo-500/20 rounded-xl text-indigo-400 border border-indigo-500/30">
-                            <ShieldCheck size={24} />
-                          </div>
-                          <div>
-                            <h3 className="text-xl font-bold tracking-tight">Centro de Control</h3>
-                            <p className="text-[10px] text-slate-400 uppercase font-bold tracking-[0.2em]">Administración Global</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2.5">
-                          <button 
-                            onClick={exportarOperacionTotal}
-                            className="p-3 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 active:scale-95 text-white rounded-2xl transition-all flex items-center gap-2 text-xs font-black uppercase tracking-wider cursor-pointer shadow-lg shadow-emerald-950/40 border border-emerald-400/20"
-                          >
-                            <FileSpreadsheet size={18} className="text-emerald-100" />
-                            EXCEL / SHEETS
-                          </button>
-                          <button 
-                            onClick={() => setActiveTab('home')}
-                            className="p-3 bg-white/10 hover:bg-white/20 rounded-2xl transition-all flex items-center gap-2 text-xs font-bold cursor-pointer"
-                          >
-                            <LogOut size={18} className="rotate-180" />
-                            SALIR PANEL
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
-                        <div className="bg-white/5 backdrop-blur-md border border-white/10 p-4 rounded-2xl flex flex-col justify-between h-20 transition-all hover:bg-white/10">
-                          <div className="flex items-center gap-2 text-slate-400">
-                            <CreditCard size={12} className="text-emerald-400" />
-                            <p className="text-[9px] uppercase font-black tracking-[0.1em]">Comisiones Hoy</p>
-                          </div>
-                          <p className="text-xl font-mono font-black text-emerald-400 leading-tight">
-                            ${allTrips.filter(v => v.estado === 'finalizado' && new Date(v.fecha).toDateString() === new Date().toDateString()).reduce((acc, v) => acc + (v.comision || 0), 0).toLocaleString()}
-                          </p>
-                        </div>
-
-                        <div 
-                          className="bg-white/5 backdrop-blur-md border border-white/10 p-4 rounded-2xl flex flex-col justify-between h-20 relative overflow-hidden group cursor-pointer transition-all hover:bg-white/10" 
-                          onClick={() => setAdminSubTab('recargas')}
-                        >
-                          <div className="flex items-center gap-2 text-slate-400">
-                            <Zap size={12} className="text-indigo-400" />
-                            <p className="text-[9px] uppercase font-black tracking-[0.1em]">Pendientes</p>
-                          </div>
-                          <div className="flex items-baseline gap-2">
-                            <p className="text-xl font-mono font-black text-indigo-400 leading-tight">{recargasPendientes.length}</p>
-                            {recargasPendientes.length > 0 && (
-                               <span className="text-[7px] font-black text-red-400 animate-pulse uppercase bg-red-400/10 px-1.5 py-0.5 rounded-full">!</span>
-                            )}
-                          </div>
-                        </div>
-
-                         <div 
-                           className="bg-white/5 backdrop-blur-md border border-white/10 p-4 rounded-2xl flex flex-col justify-between h-20 transition-all hover:bg-white/10 cursor-pointer"
-                           onClick={() => setAdminSubTab('ranking')}
-                         >
-                           <div className="flex items-center gap-2 text-slate-400">
-                             <Trophy size={12} className="text-amber-400" />
-                             <p className="text-[9px] uppercase font-black tracking-[0.1em]">Ranking Elite</p>
-                           </div>
-                           <p className="text-xl font-mono font-black text-amber-400 leading-tight">
-                             {allDrivers.reduce((acc, d) => acc + (d.servicios_semanales || 0), 0)}
-                           </p>
-                         </div>
-
-                         <div className="bg-white/5 backdrop-blur-md border border-white/10 p-4 rounded-2xl flex flex-col justify-between h-20 transition-all hover:bg-white/10">
-                          <div className="flex items-center gap-2 text-slate-400">
-                            <Trophy size={12} className="text-amber-400" />
-                            <p className="text-[9px] uppercase font-black tracking-[0.1em]">Servicios Totales</p>
-                          </div>
-                          <p className="text-xl font-mono font-black text-amber-400 leading-tight">
-                            {globalStats?.total_servicios_completados || 0}
-                          </p>
-                        </div>
-                        
-                        <div className="hidden lg:flex bg-white/5 backdrop-blur-md border border-white/10 p-4 rounded-2xl flex-col justify-between h-20 transition-all hover:bg-white/10">
-                          <div className="flex items-center gap-2 text-slate-400">
-                            <UserIcon size={12} className="text-blue-400" />
-                            <p className="text-[9px] uppercase font-black tracking-[0.1em]">Usuarios</p>
-                          </div>
-                          <p className="text-xl font-mono font-black text-blue-400 leading-tight">
-                            {allUsers.filter(u => u.rol !== 'marca_aliada').length}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Sub-tabs Admin Navigation */}
-                      <div className="flex p-1.5 bg-slate-100/80 rounded-2xl border border-slate-200/50 gap-0.5 overflow-x-auto no-scrollbar">
-                        {[
-                          { id: 'resumen', label: 'Resumen', icon: Zap },
-                          { id: 'activacion', label: 'Activación Conductores', icon: UserCheck },
-                          { id: 'espera', label: 'Monitor', icon: Clock },
-                          { id: 'historial', label: 'Historial', icon: FileText },
-                          { id: 'recargas', label: 'Recargas', icon: CreditCard },
-                          { id: 'conductores', label: 'Conductores', icon: Car },
-                          { id: 'usuarios', label: 'Usuarios', icon: UserIcon },
-                          { id: 'ranking', label: 'Ranking', icon: Trophy },
-                          { id: 'alertas', label: 'Alertas', icon: ShieldAlert },
-                          { id: 'soporte', label: 'Soporte', icon: Headphones },
-                          { id: 'aliados', label: 'Aliados', icon: Store },
-                          { id: 'depuracion', label: 'Depuración & Spam', icon: Trash2 }
-                        ].map((tab, tIdx) => (
-                          <button 
-                            key={`admin-subtab-${tab.id}-${tIdx}`}
-                            onClick={() => setAdminSubTab(tab.id as any)}
-                            className={`flex items-center gap-2 px-3 py-2 rounded-xl text-[10px] font-bold uppercase transition-all whitespace-nowrap relative ${adminSubTab === tab.id ? 'bg-white text-indigo-600 shadow-sm border border-slate-200' : 'text-slate-500 hover:text-slate-800 hover:bg-white/50'}`}
-                          >
-                          <tab.icon size={14} className={
-                            (tab.id === 'recargas' && recargasPendientes.length > 0) || 
-                            (tab.id === 'espera' && unattendedTrips.length > 0) ||
-                            (tab.id === 'aliados' && marcasAliadas.filter(isMarcaPendiente).length > 0) ||
-                            (tab.id === 'depuracion' && totalSpamOInactivos > 0)
-                            ? "text-rose-500" : ""
-                          } />
-                          <span className="relative">
-                            {tab.label}
-                            {tab.id === 'espera' && unattendedTrips.length > 0 && (
-                              <span className="absolute -right-2 -top-1 px-1 min-w-[12px] h-3 bg-red-500 text-white text-[7px] flex items-center justify-center rounded-full animate-pulse">
-                                {unattendedTrips.length}
-                              </span>
-                            )}
-                            {tab.id === 'recargas' && recargasPendientes.length > 0 && (
-                              <span className="absolute -right-1.5 -top-1 w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />
-                            )}
-                            {tab.id === 'alertas' && calificacionesBajas.length > 0 && (
-                              <span className="absolute -right-1.5 -top-1 w-1.5 h-1.5 bg-amber-500 rounded-full animate-pulse" />
-                            )}
-                            {tab.id === 'soporte' && supportChats.some(c => !c.leidoPorAdmin) && (
-                              <span className="absolute -right-1.5 -top-1 w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse" />
-                            )}
-                            {tab.id === 'aliados' && marcasAliadas.filter(isMarcaPendiente).length > 0 && (
-                              <span className="absolute -right-1.5 -top-1 w-1.5 h-1.5 bg-amber-500 rounded-full animate-pulse" />
-                            )}
-                            {tab.id === 'depuracion' && totalSpamOInactivos > 0 && (
-                              <span className="absolute -right-2 -top-1 px-1.5 min-w-[14px] h-3.5 bg-rose-500 text-white text-[8px] font-black flex items-center justify-center rounded-full shadow-xs">
-                                {totalSpamOInactivos}
-                              </span>
-                            )}
-                          </span>
-                          {tab.id === 'recargas' && recargasPendientes.length > 0 && (
-                            <div className="absolute -top-2 -right-2 flex items-center justify-center z-30">
-                              <span className="absolute w-6 h-6 bg-red-400 rounded-full animate-ping opacity-75" />
-                              <span className="relative w-5 h-5 bg-red-600 text-white text-[10px] font-black rounded-full flex items-center justify-center border-2 border-white shadow-lg">
-                                {recargasPendientes.length}
-                              </span>
-                            </div>
-                          )}
-                          {tab.id === 'aliados' && marcasAliadas.filter(isMarcaPendiente).length > 0 && (
-                            <div className="absolute -top-2 -right-2 flex items-center justify-center z-30">
-                              <span className="absolute w-6 h-6 bg-amber-400 rounded-full animate-ping opacity-75" />
-                              <span className="relative w-5 h-5 bg-amber-500 text-white text-[10px] font-black rounded-full flex items-center justify-center border-2 border-white shadow-lg">
-                                {marcasAliadas.filter(isMarcaPendiente).length}
-                              </span>
-                            </div>
-                          )}
-                          {tab.id === 'alertas' && calificacionesBajas.length > 0 && (
-                            <div className="absolute -top-2 -right-2 flex items-center justify-center z-30">
-                              <span className="absolute w-6 h-6 bg-amber-400 rounded-full animate-ping opacity-75" />
-                              <span className="relative w-5 h-5 bg-amber-600 text-white text-[10px] font-black rounded-full flex items-center justify-center border-2 border-white shadow-lg">
-                                {calificacionesBajas.length}
-                              </span>
-                            </div>
-                          )}
-                        </button>
-                      ))}
-                    </div>
-
-                  {/* Admin Content Area */}
-                  <div className="min-h-[400px]">
-                    <AnimatePresence mode="wait">
-                      <motion.div
-                        key={`admin-subtab-panel-${adminSubTab}`}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -10 }}
-                        transition={{ duration: 0.2 }}
-                        className="space-y-4"
-                      >
-                        {adminSubTab === 'resumen' && (
-                          <AdminResumenFinanciero />
-                        )}
-
-                        {adminSubTab === 'ranking' && (
-                          <div className="bg-white p-6 rounded-[3rem] border border-slate-100 shadow-xl overflow-hidden">
-                            <LeaderboardView />
-                          </div>
-                        )}
-
-                        {adminSubTab === 'alertas' && (
-                          <div className="space-y-4">
-                            <div className="flex items-center justify-between px-2">
-                              <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">Alertas de Seguridad (Baja Calificación)</h4>
-                              <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">{calificacionesBajas.length} Reportes</span>
-                            </div>
-
-                            {calificacionesBajas.length > 0 ? (
-                              <div className="space-y-3">
-                                {calificacionesBajas.map((calif, cIdx) => {
-                                  const driverInfo = allDrivers.find(d => d.id === calif.conductorId);
-                                  return (
-                                    <motion.div 
-                                      layout
-                                      key={`calif-baja-${calif.id || cIdx}-${cIdx}`}
-                                      className="bg-white p-5 rounded-[2rem] border border-slate-100 shadow-sm space-y-4"
-                                    >
-                                      <div className="flex justify-between items-start">
-                                        <div className="flex items-center gap-3">
-                                          <div className="w-10 h-10 bg-amber-50 rounded-xl flex items-center justify-center text-amber-600">
-                                            <ShieldAlert size={20} />
-                                          </div>
-                                          <div>
-                                            <p className="text-sm font-bold text-slate-800">Conductor: {driverInfo?.nombre || 'Desconocido'}</p>
-                                            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-tighter">ID: {calif.conductorId.slice(-8)}</p>
-                                          </div>
-                                        </div>
-                                        <div className="flex items-center gap-1 bg-amber-50 px-3 py-1 rounded-full">
-                                          {[1, 2, 3, 4, 5].map((star) => (
-                                            <Star 
-                                              key={`calif-star-${calif.id || cIdx}-${cIdx}-${star}`} 
-                                              size={12} 
-                                              className={star <= calif.estrellas ? "text-amber-500 fill-amber-500" : "text-slate-200"} 
-                                            />
-                                          ))}
-                                        </div>
-                                      </div>
-
-                                      <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                                        <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">Comentario del Usuario</p>
-                                        <p className="text-xs text-slate-700 italic">"{calif.comentario || 'Sin comentario'}"</p>
-                                      </div>
-
-                                      <div className="flex justify-between items-center pt-2 flex-wrap gap-2">
-                                        <div className="flex items-center gap-2">
-                                          {driverInfo?.bloqueado ? (
-                                            <AdminDriverBlockBadge cond={driverInfo} />
-                                          ) : (
-                                            <>
-                                              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                                              <span className="text-[10px] font-bold text-slate-500 uppercase">
-                                                Estado: Activo
-                                              </span>
-                                            </>
-                                          )}
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                          <button 
-                                            onClick={async () => {
-                                              try {
-                                                await deleteDoc(doc(db, 'calificaciones', calif.id));
-                                                toast('Notificación/Alerta resuelta y eliminada');
-                                              } catch (error) {
-                                                console.error("Error al eliminar la alerta:", error);
-                                                toast('Error al eliminar la notificación');
-                                              }
-                                            }}
-                                            className="px-4 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 hover:text-emerald-800 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1 border border-emerald-100 cursor-pointer"
-                                            title="Resolver y Eliminar Alerta"
-                                          >
-                                            <Check size={11} className="stroke-[3px]" />
-                                            Marcar como Leída / Resolver
-                                          </button>
-                                          <button 
-                                            onClick={() => {
-                                              setAdminActionType('confirm_bloqueo_conductor');
-                                              setAdminActionTarget(driverInfo);
-                                              setShowAdminActionModal(true);
-                                            }}
-                                            className={`px-4 py-2 rounded-xl text-[10px] font-bold uppercase transition-all cursor-pointer ${driverInfo?.bloqueado ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'}`}
-                                          >
-                                            {driverInfo?.bloqueado ? 'Desbloquear Sanción' : 'Bloquear Conductor'}
-                                          </button>
-                                        </div>
-                                      </div>
-                                    </motion.div>
-                                  );
-                                })}
-                              </div>
-                            ) : (
-                              <div className="py-16 text-center bg-slate-50 rounded-[2.5rem] border border-dashed border-slate-200 space-y-3">
-                                <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center mx-auto text-slate-200 shadow-sm">
-                                  <Check size={24} />
-                                </div>
-                                <p className="text-xs text-slate-400 font-medium">No hay reportes de baja calificación</p>
-                              </div>
-                            )}
-                          </div>
-                        )}
-
-                        {adminSubTab === 'espera' && (
-                          <div className="space-y-8 animate-in fade-in duration-700">
-                            {/* Hero Alerta section */}
-                            {unattendedTrips.some(t => (currentTime.getTime() - new Date(t.fecha).getTime()) > 6 * 60 * 1000) && (
-                              <motion.div 
-                                initial={{ opacity: 0, y: -20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                className="relative overflow-hidden group"
-                              >
-                                <div className="absolute inset-0 bg-gradient-to-r from-rose-500 to-rose-600 blur-xl opacity-20 animate-pulse" />
-                                <div className="relative bg-white/80 backdrop-blur-2xl border border-rose-100 p-8 rounded-[3rem] flex flex-col md:flex-row items-center gap-8 shadow-2xl shadow-rose-200/40">
-                                  <div className="w-20 h-20 bg-rose-500 rounded-[2rem] flex items-center justify-center text-white shadow-2xl shadow-rose-500/40 shrink-0 transform group-hover:rotate-12 transition-transform duration-500">
-                                    <AlertTriangle size={36} className="animate-bounce" />
-                                  </div>
-                                  <div className="flex-1 text-center md:text-left">
-                                    <h3 className="text-2xl font-black text-rose-950 uppercase tracking-[0.1em] mb-2 text-balance">Servicios en Riesgo Crítico</h3>
-                                    <p className="text-sm text-rose-600/80 font-medium leading-relaxed max-w-2xl px-4 md:px-0">
-                                      Detectamos usuarios con más de 6 minutos de espera sin asignación. Es imperativo contactar conductores cercanos o recalibrar la oferta.
-                                    </p>
-                                  </div>
-                                  <button className="px-8 py-4 bg-rose-600 text-white text-[10px] font-black rounded-2xl shadow-xl shadow-rose-200 hover:bg-rose-700 hover:shadow-rose-300 transition-all active:scale-95 uppercase tracking-[0.2em] whitespace-nowrap">
-                                    Intervenir Ahora
-                                  </button>
-                                </div>
-                              </motion.div>
-                            )}
-
-                            {/* Stats & Title Grid */}
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                              <div className="md:col-span-2 flex flex-col justify-end pb-2">
-                                <h2 className="text-4xl font-black text-slate-900 tracking-tighter mb-2">Monitor de <span className="text-indigo-600">Espera</span></h2>
-                                <p className="text-xs text-slate-400 font-bold uppercase tracking-widest flex items-center gap-2">
-                                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                                  Flujo de servicios en tiempo real
-                                </p>
-                              </div>
-                              <div className="flex items-center gap-4 bg-white/50 backdrop-blur-xl p-4 rounded-[2rem] border border-white/60 shadow-sm self-end">
-                                <div className="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-600">
-                                  <Clock size={20} />
-                                </div>
-                                <div>
-                                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">En cola activa</p>
-                                  <p className="text-2xl font-mono font-black text-slate-900">{unattendedTrips.length} SOLICITUDES</p>
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Active Queue By City */}
-                            <div className="space-y-12">
-                              {Object.keys(unattendedByCity).length > 0 ? Object.entries(unattendedByCity).map(([city, trips], cityIdx) => {
-                                const cityDrivers = availableDriversByCity[city] || [];
-                                const criticalCount = trips.filter(t => (currentTime.getTime() - new Date(t.fecha).getTime()) > 6 * 60 * 1000).length;
-
-                                return (
-                                  <div key={`unattended-city-${city || cityIdx}-${cityIdx}`} className="space-y-6">
-                                    {/* City Header */}
-                                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-4">
-                                      <div className="flex items-center gap-4">
-                                        <div className="w-12 h-12 bg-slate-900 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-slate-200">
-                                          <MapPin size={24} />
-                                        </div>
-                                        <div>
-                                          <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tight">{city}</h3>
-                                          <div className="flex items-center gap-3">
-                                            <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">{trips.length} Solicitudes</span>
-                                            <span className="w-1 h-1 bg-slate-200 rounded-full" />
-                                            <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">{cityDrivers.length} Disponibles</span>
-                                          </div>
-                                        </div>
-                                      </div>
-                                      
-                                      {criticalCount > 0 && (
-                                        <div className="px-4 py-2 bg-rose-50 border border-rose-100 rounded-xl flex items-center gap-2 animate-pulse">
-                                          <AlertCircle size={14} className="text-rose-500" />
-                                          <span className="text-[10px] font-black text-rose-600 uppercase tracking-widest">{criticalCount} CRÍTICOS</span>
-                                        </div>
-                                      )}
-                                    </div>
-
-                                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                                      {/* Trips Column */}
-                                      <div className="lg:col-span-2 space-y-4">
-                                        <div className="flex items-center gap-2 px-4">
-                                          <div className="h-[2px] w-4 bg-indigo-500 rounded-full" />
-                                          <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">Servicios Pendientes</span>
-                                        </div>
-                                        <div className="grid gap-4">
-                                          {trips.sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime()).map((trip, idx) => {
-                                            const diffMin = Math.floor((currentTime.getTime() - new Date(trip.fecha).getTime()) / 60000);
-                                            const urgency = diffMin > 8 ? 'critical' : diffMin > 4 ? 'high' : 'normal';
-                                            
-                                            return (
-                                              <motion.div 
-                                                layout
-                                                initial={{ opacity: 0, y: 10 }}
-                                                animate={{ opacity: 1, y: 0 }}
-                                                transition={{ delay: idx * 0.05 }}
-                                                key={`city-unattended-trip-${trip.id || idx}-${idx}`}
-                                                className={`group bg-white rounded-[2.5rem] border-2 transition-all p-6 ${
-                                                  urgency === 'critical' ? 'border-rose-100 bg-rose-50/10' : 
-                                                  urgency === 'high' ? 'border-amber-100 bg-amber-50/10' : 'border-slate-50'
-                                                } hover:shadow-xl hover:shadow-slate-200/40`}
-                                              >
-                                                <div className="flex flex-col gap-6">
-                                                  <div className="flex items-start justify-between">
-                                                    <div className="flex items-center gap-4">
-                                                      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-lg font-black shrink-0 ${
-                                                        urgency === 'critical' ? 'bg-rose-500 text-white' : 'bg-slate-100 text-slate-400'
-                                                      }`}>
-                                                        {trip.usuarioNombre?.charAt(0) || 'U'}
-                                                      </div>
-                                                      <div>
-                                                        <h4 className="text-base font-black text-slate-900 truncate uppercase tracking-tight">{trip.usuarioNombre}</h4>
-                                                        <div className="flex items-center gap-2 mt-1">
-                                                          <span className="px-2 py-0.5 bg-slate-900 text-white text-[8px] font-black rounded-md uppercase">
-                                                            {trip.tipo || 'Viaje'}
-                                                          </span>
-                                                          <span className="text-[10px] font-black text-indigo-600">${trip.valor?.toLocaleString()}</span>
-                                                        </div>
-                                                      </div>
-                                                    </div>
-                                                    <div className={`px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest ${
-                                                      urgency === 'critical' ? 'bg-rose-500 text-white animate-pulse' : 
-                                                      urgency === 'high' ? 'bg-amber-500 text-white' : 'bg-slate-900 text-white'
-                                                    }`}>
-                                                      {diffMin}m esperando
-                                                    </div>
-                                                  </div>
-
-                                                  <div className="space-y-2">
-                                                    <div className="flex items-center gap-3">
-                                                      <div className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
-                                                      <p className="text-[11px] font-bold text-slate-500 truncate">{trip.ruta?.origen?.split(',')[0] || trip.origenTexto}</p>
-                                                    </div>
-                                                    <div className="flex items-center gap-3">
-                                                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                                                      <p className="text-[11px] font-black text-slate-700 truncate">{trip.ruta?.destino?.split(',')[0] || trip.destinoTexto}</p>
-                                                    </div>
-                                                  </div>
-
-                                                  <div className="flex gap-2">
-                                                    <button 
-                                                      onClick={() => {
-                                                        let phone = trip.usuarioTelefono?.replace(/\D/g, '') || '';
-                                                        if (!phone) {
-                                                          toast.error("El usuario no tiene un teléfono registrado");
-                                                          return;
-                                                        }
-                                                        if (phone.length === 10) phone = `57${phone}`;
-                                                        
-                                                        const mensaje = encodeURIComponent(`Hola ${trip.usuarioNombre}, soy el administrador de Ruedas Rápidas. Vemos que tienes un servicio en espera, ¿todo bien?`);
-                                                        window.open(`https://wa.me/${phone}?text=${mensaje}`, '_blank');
-                                                      }}
-                                                      className="flex-1 h-10 bg-emerald-500 text-white rounded-xl font-black text-[9px] uppercase tracking-widest flex items-center justify-center gap-1.5 hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-100 cursor-pointer"
-                                                    >
-                                                      <Headphones size={13} />
-                                                      LLAMAR
-                                                    </button>
-                                                    <button 
-                                                      onClick={() => {
-                                                        setAdminMessageTarget({ id: trip.usuarioId, nombre: trip.usuarioNombre, type: 'usuario' });
-                                                        setShowAdminMessageModal(true);
-                                                      }}
-                                                      className="flex-1 h-10 bg-slate-900 text-white rounded-xl font-black text-[9px] uppercase tracking-widest flex items-center justify-center gap-1.5 hover:bg-black transition-all shadow-lg shadow-slate-200 cursor-pointer"
-                                                    >
-                                                      <MessageCircle size={13} />
-                                                      NOTIFICAR
-                                                    </button>
-                                                    <button 
-                                                      onClick={() => {
-                                                        setSelectedTripForAdminCancel(trip);
-                                                        setAdminCancelReason('Tiempo de espera prolongado');
-                                                        setAdminCancelCustomReason('');
-                                                        setShowAdminCancelTripModal(true);
-                                                      }}
-                                                      className="flex-1 h-10 bg-rose-50 text-rose-600 border border-rose-100 rounded-xl font-black text-[9px] uppercase tracking-widest flex items-center justify-center gap-1.5 hover:bg-rose-100 transition-all shadow-md shadow-rose-100/50 cursor-pointer"
-                                                    >
-                                                      <XCircle size={13} />
-                                                      ANULAR
-                                                    </button>
-                                                  </div>
-                                                </div>
-                                              </motion.div>
-                                            );
-                                          })}
-                                        </div>
-                                      </div>
-
-                                      {/* Available Drivers Column */}
-                                      <div className="space-y-4">
-                                        <div className="flex items-center gap-2 px-4">
-                                          <div className="h-[2px] w-4 bg-emerald-500 rounded-full" />
-                                          <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">Flota Disponible</span>
-                                        </div>
-                                        <div className="bg-slate-50/50 rounded-[2.5rem] border border-slate-100 p-6 space-y-4 max-h-[600px] overflow-y-auto no-scrollbar">
-                                          {cityDrivers.length > 0 ? cityDrivers.map((d, dIdx) => (
-                                            <motion.div 
-                                              initial={{ opacity: 0, x: 20 }}
-                                              animate={{ opacity: 1, x: 0 }}
-                                              transition={{ delay: dIdx * 0.05 }}
-                                              key={`city-driver-${d.id || dIdx}-${dIdx}`}
-                                              className="bg-white p-4 rounded-2xl border border-slate-100 flex items-center gap-4 group hover:border-emerald-200 transition-all shadow-sm"
-                                            >
-                                              <div className="relative">
-                                                <div className="w-12 h-12 bg-slate-900 rounded-xl flex items-center justify-center shrink-0 overflow-hidden">
-                                                  {d.foto ? (
-                                                    <img src={d.foto} alt="" className="w-full h-full object-cover" />
-                                                  ) : (
-                                                    <UserIcon className="text-white/20" size={20} />
-                                                  )}
-                                                </div>
-                                                <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 border-2 border-white rounded-full" />
-                                              </div>
-                                              <div className="flex-1 min-w-0">
-                                                <h5 className="text-xs font-black text-slate-800 uppercase truncate leading-tight">{d.nombre}</h5>
-                                                <div className="flex items-center gap-2 mt-1">
-                                                  <div className="flex items-center gap-0.5">
-                                                    <Star size={8} className="text-amber-500 fill-amber-500" />
-                                                    <span className="text-[9px] font-bold text-amber-600">{d.calificacion?.toFixed(1) || '5.0'}</span>
-                                                  </div>
-                                                  <span className="text-[8px] font-black text-slate-400 uppercase tracking-tighter truncate max-w-[80px]">
-                                                    {d.vehiculo?.modelo || d.vehiculo?.tipo}
-                                                  </span>
-                                                </div>
-                                              </div>
-                                              <button 
-                                                onClick={() => {
-                                                  let phone = d.telefono?.replace(/\D/g, '') || '';
-                                                  if (!phone) {
-                                                    toast.error("El conductor no tiene un teléfono registrado");
-                                                    return;
-                                                  }
-                                                  
-                                                  // Hardening for Colombia: if 10 digits, add 57. If starts with 57, keep it.
-                                                  if (phone.length === 10) {
-                                                    phone = `57${phone}`;
-                                                  } else if (phone.length > 10 && phone.startsWith('0')) {
-                                                    // some old formats or mistakes
-                                                    phone = `57${phone.substring(1)}`;
-                                                  }
-
-                                                  const mensaje = encodeURIComponent(`Hola ${d.nombre}, hay servicios pendientes en ${city}. ¿Estás disponible?`);
-                                                  window.open(`https://wa.me/${phone}?text=${mensaje}`, '_blank');
-                                                }}
-                                                className="h-10 px-4 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center gap-2 hover:bg-emerald-600 hover:text-white transition-all font-black text-[9px] uppercase tracking-widest shadow-sm border border-emerald-100"
-                                                title="Gestionar por WhatsApp"
-                                              >
-                                                <MessageCircle size={14} />
-                                                GESTIONAR
-                                              </button>
-                                            </motion.div>
-                                          )) : (
-                                            <div className="py-12 text-center space-y-4">
-                                              <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center mx-auto text-rose-200 border border-rose-50 shadow-sm">
-                                                <ShieldAlert size={28} />
-                                              </div>
-                                              <p className="text-[10px] font-black text-rose-400 uppercase tracking-widest px-4">Sin conductores disponibles en esta ciudad</p>
-                                            </div>
-                                          )}
-                                        </div>
-                                      </div>
-                                    </div>
-                                  </div>
-                                );
-                              }) : (
-                                <div className="py-32 text-center bg-white rounded-[4rem] border-2 border-slate-50 border-dashed space-y-8">
-                                  <div className="relative mx-auto w-32 h-32">
-                                    <div className="absolute inset-0 bg-emerald-500/5 rounded-full animate-pulse scale-150 blur-3xl" />
-                                    <div className="relative w-full h-full bg-white rounded-[3rem] border border-slate-100 flex items-center justify-center text-emerald-500 shadow-2xl">
-                                      <ShieldCheck size={56} strokeWidth={1.5} />
-                                    </div>
-                                  </div>
-                                  <div className="space-y-2">
-                                    <h4 className="text-2xl font-black text-slate-900 tracking-tight">Zona Despejada</h4>
-                                    <p className="text-sm text-slate-400 font-medium px-8 mx-auto max-sm:px-4 max-w-sm">No hay servicios detenidos. El sistema fluye con normalidad operativa.</p>
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        )}
-
-                        {adminSubTab === 'historial' && (
-                          <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-                            {/* Analytics section - Simplified for elegance */}
-                            <div className="relative overflow-hidden group">
-                              <div className="absolute inset-0 bg-slate-900 rounded-[3.5rem]" />
-                              <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/20 to-rose-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-1000" />
-                              <div className="relative p-12 text-white">
-                                <div className="flex flex-col lg:flex-row gap-12">
-                                  {/* Stats Summary */}
-                                  <div className="lg:w-1/3 space-y-10">
-                                    <div className="space-y-4">
-                                      <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-rose-500 rounded-full text-[10px] font-black uppercase tracking-[0.2em] shadow-xl shadow-rose-900/40">
-                                        Auditoría Crítica
-                                      </div>
-                                      <h3 className="text-4xl font-black tracking-tighter leading-tight">Métricas de <br/><span className="text-rose-400">Deserción</span></h3>
-                                      <p className="text-slate-400 text-sm font-medium leading-relaxed">Información consolidada de cancelaciones por usuario, conductor y sistema.</p>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-4">
-                                      <div className="bg-white/5 p-6 rounded-3xl border border-white/5">
-                                        <p className="text-[9px] font-black text-slate-400 uppercase mb-2">Total Hoy</p>
-                                        <p className="text-3xl font-mono font-black">{historicalWaitingStats.todayStats.total}</p>
-                                      </div>
-                                      <div className="bg-white/5 p-6 rounded-3xl border border-white/5">
-                                        <p className="text-[9px] font-black text-slate-400 uppercase mb-2">Valor Perdido</p>
-                                        <p className="text-xl font-mono font-black text-rose-400">${historicalWaitingStats.todayStats.valorTotal.toLocaleString()}</p>
-                                      </div>
-                                    </div>
-                                  </div>
-
-                                  {/* Trend Chart */}
-                                  <div className="lg:flex-1 bg-white/5 p-8 rounded-[3rem] border border-white/10 flex flex-col">
-                                    <div className="flex justify-between items-center mb-8">
-                                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Histórico Semanal</p>
-                                      <div className="flex gap-2">
-                                        <div className="w-2 h-2 rounded-full bg-rose-500" />
-                                        <div className="w-2 h-2 rounded-full bg-white/10" />
-                                      </div>
-                                    </div>
-                                    <div className="h-64">
-                                      <ResponsiveContainer width="100%" height="100%">
-                                        <AreaChart data={historicalWaitingStats.trend}>
-                                          <defs>
-                                            <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
-                                              <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.3}/>
-                                              <stop offset="95%" stopColor="#f43f5e" stopOpacity={0}/>
-                                            </linearGradient>
-                                          </defs>
-                                          <XAxis dataKey="name" hide />
-                                          <Tooltip 
-                                            contentStyle={{ backgroundColor: '#0f172a', border: 'none', borderRadius: '1rem', fontSize: '10px' }}
-                                            itemStyle={{ color: '#fff' }}
-                                          />
-                                          <Area type="monotone" dataKey="total" stroke="#f43f5e" strokeWidth={4} fillOpacity={1} fill="url(#colorTotal)" />
-                                        </AreaChart>
-                                      </ResponsiveContainer>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Detailed Cancellation Feed - Persists even after notification clear */}
-                            <div className="bg-white rounded-[3.5rem] border border-slate-100 shadow-sm p-10">
-                              <div className="flex items-center justify-between mb-10">
-                                <div>
-                                  <h4 className="text-xl font-black text-slate-900 tracking-tight">Registro Maestro de Cancelaciones</h4>
-                                  <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">Archivo histórico de hoy - Datos Inmutables</p>
-                                </div>
-                                <div className="text-right">
-                                  <p className="text-2xl font-mono font-black text-indigo-600">{historicalWaitingStats.todayCancelled.length}</p>
-                                  <p className="text-[8px] font-black text-slate-400 uppercase uppercase">Incidentes</p>
-                                </div>
-                              </div>
-                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                {historicalWaitingStats.todayCancelled.slice(0, 18).map((trip: any, tIdx: number) => (
-                                  <div key={`today-cancelled-${trip.id || tIdx}-${tIdx}`} className="p-6 bg-slate-50 rounded-[2.5rem] border border-slate-100 hover:bg-white hover:shadow-2xl hover:shadow-slate-200/50 transition-all group overflow-hidden">
-                                    <div className="flex justify-between items-start mb-6">
-                                      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-xl ${
-                                        trip.canceladoPor === 'usuario' ? 'bg-indigo-500 shadow-indigo-100' :
-                                        trip.canceladoPor === 'conductor' ? 'bg-amber-500 shadow-amber-100' : 'bg-slate-800 shadow-slate-100'
-                                      }`}>
-                                        {trip.canceladoPor === 'usuario' ? <UserIcon size={20} /> : <Car size={20} />}
-                                      </div>
-                                      <p className="text-[10px] font-mono font-black text-slate-400">
-                                        {new Date(trip.fecha_cancelacion || trip.fecha).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                      </p>
-                                    </div>
-                                    <div className="space-y-4">
-                                      <div>
-                                        <p className="text-sm font-black text-slate-800 truncate">{trip.usuarioNombre}</p>
-                                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter mt-0.5">Cliente del servicio</p>
-                                      </div>
-                                      <div className="space-y-1">
-                                         <div className="flex items-center gap-2 text-[10px] font-bold text-slate-500 truncate">
-                                          <MapPin size={10} className="shrink-0 text-indigo-400" />
-                                          {trip.ruta?.origen?.split(',')[0]}
-                                        </div>
-                                        <div className="flex items-center gap-2 text-[10px] font-bold text-slate-500 truncate">
-                                          <Navigation size={10} className="shrink-0 text-emerald-400" />
-                                          {trip.ruta?.destino?.split(',')[0]}
-                                        </div>
-                                      </div>
-
-                                      {/* City Metadata */}
-                                      <div className="pt-3 border-t border-slate-100 flex gap-4">
-                                        <div className="flex flex-col">
-                                          <span className="text-[7px] font-black text-slate-400 uppercase tracking-widest">Ciudad Usuario</span>
-                                          <span className="text-[9px] font-bold text-slate-700 truncate">{trip.usuarioCiudad || trip.ciudad || 'N/A'}</span>
-                                        </div>
-                                        {trip.conductorId && (
-                                          <div className="flex flex-col border-l border-slate-100 pl-4">
-                                            <span className="text-[7px] font-black text-slate-400 uppercase tracking-widest">Ciudad Conductor</span>
-                                            <span className="text-[9px] font-bold text-slate-700 truncate">{trip.conductorCiudad || 'N/A'}</span>
-                                          </div>
-                                        )}
-                                      </div>
-
-                                      <div className="pt-4 border-t border-slate-200 flex items-center justify-between">
-                                        <span className={`text-[8px] font-black px-2 py-1 rounded-lg uppercase ${
-                                          trip.estado === 'finalizado_cancelado' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'
-                                        }`}>
-                                          {trip.estado === 'finalizado_cancelado' ? 'Auditado' : 'Pendiente'}
-                                        </span>
-                                        <div className="flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                                          <button 
-                                            onClick={() => {
-                                              setAdminMessageTarget({ id: trip.usuarioId, nombre: trip.usuarioNombre, type: 'usuario' });
-                                              setShowAdminMessageModal(true);
-                                            }}
-                                            className="w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:text-indigo-600 hover:border-indigo-100 transition-all font-bold"
-                                          >
-                                            <MessageCircle size={14} />
-                                          </button>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                              {historicalWaitingStats.todayCancelled.length === 0 && (
-                                <div className="py-20 text-center opacity-40">
-                                  <p className="text-[10px] font-black uppercase tracking-[0.3em]">Sin registros negativos hoy</p>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        )}
-                        {adminSubTab === 'recargas' && (
-                        <div className="space-y-6">
-                          {/* Financial BI Dashboard Header */}
-                          <div className="bg-slate-900 p-6 rounded-[2.5rem] text-white shadow-xl shadow-slate-200 relative overflow-hidden">
-                            <div className="absolute top-0 right-0 p-8 opacity-10">
-                              <CreditCard size={120} />
-                            </div>
-                            <div className="relative z-10">
-                              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-                                <div className="flex items-center gap-3">
-                                  <div className="w-12 h-12 bg-indigo-500 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-500/20">
-                                    <CreditCard size={24} />
-                                  </div>
-                                  <div>
-                                    <h3 className="text-lg font-black uppercase tracking-widest">Dashboard Financiero</h3>
-                                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">Recaudos y flujo de caja</p>
-                                  </div>
-                                </div>
-                                <div className="flex items-center gap-3 bg-white/5 backdrop-blur-md px-4 py-2 rounded-2xl border border-white/10">
-                                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                  <p className="text-[9px] font-black uppercase tracking-widest text-slate-300">Hoy:</p>
-                                  <p className="text-lg font-mono font-black text-emerald-400">${rechargesStats.dailyTotal.toLocaleString()}</p>
-                                </div>
-                              </div>
-
-                              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <div className="bg-white/5 p-4 rounded-2xl border border-white/5 hover:bg-white/10 transition-colors">
-                                  <div className="flex items-center justify-between mb-1">
-                                    <p className="text-[8px] font-black text-indigo-400 uppercase tracking-widest">Recaudación Aprobada</p>
-                                    <span className="text-[8px] font-bold bg-indigo-500/20 text-indigo-300 px-1.5 py-0.5 rounded-full">{rechargesStats.approvedCount}</span>
-                                  </div>
-                                  <p className="text-2xl font-mono font-black text-white">${rechargesStats.totalCalculated.toLocaleString()}</p>
-                                </div>
-
-                                <div className="bg-white/5 p-4 rounded-2xl border border-white/5 hover:bg-white/10 transition-colors">
-                                  <div className="flex items-center justify-between mb-1">
-                                    <p className="text-[8px] font-black text-amber-400 uppercase tracking-widest">Ajustes Manuales</p>
-                                    <span className="text-[8px] font-bold bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded-full">{rechargesStats.manualCount}</span>
-                                  </div>
-                                  <p className="text-2xl font-mono font-black text-white">${rechargesStats.totalManuales.toLocaleString()}</p>
-                                </div>
-
-                                <div className="bg-white/5 p-4 rounded-2xl border border-white/5 hover:bg-white/10 transition-colors">
-                                  <div className="flex items-center justify-between mb-1">
-                                    <p className="text-[8px] font-black text-emerald-400 uppercase tracking-widest">Cierre Mes</p>
-                                  </div>
-                                  <p className="text-2xl font-mono font-black text-white">${rechargesStats.monthlyTotal.toLocaleString()}</p>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Charts Section */}
-                          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                            <div className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-xl hover:shadow-slate-200/50 transition-all duration-500">
-                              <div className="flex items-center justify-between mb-8">
-                                <div>
-                                  <h4 className="text-[10px] font-black text-slate-800 uppercase tracking-[0.2em]">Curva de Recaudos (7D)</h4>
-                                  <p className="text-[8px] text-slate-400 font-bold uppercase mt-0.5">Tendencia semanal de ingresos</p>
-                                </div>
-                                <div className="flex gap-2">
-                                  <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-500 flex items-center justify-center">
-                                    <Zap size={14} />
-                                  </div>
-                                </div>
-                              </div>
-                              <div className="h-48 w-full">
-                                <ResponsiveContainer width="100%" height="100%">
-                                  <AreaChart data={rechargesStats.last7Days}>
-                                    <defs>
-                                      <linearGradient id="colorTotalRec" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#6366f1" stopOpacity={0.2}/>
-                                        <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
-                                      </linearGradient>
-                                    </defs>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                                    <XAxis 
-                                      dataKey="name" 
-                                      axisLine={false} 
-                                      tickLine={false} 
-                                      tick={{ fontSize: 9, fontWeight: 900, fill: '#94a3b8' }} 
-                                    />
-                                    <Tooltip 
-                                      contentStyle={{ borderRadius: '1.5rem', border: 'none', boxShadow: '0 25px 50px -12px rgb(0 0 0 / 0.15)', fontSize: '10px', fontWeight: 'bold', padding: '16px' }}
-                                      formatter={(value: any) => [`$${value.toLocaleString()}`, 'Recaudado']}
-                                    />
-                                    <Area type="monotone" dataKey="total" stroke="#6366f1" strokeWidth={3} fillOpacity={1} fill="url(#colorTotalRec)" />
-                                  </AreaChart>
-                                </ResponsiveContainer>
-                              </div>
-                            </div>
-
-                            <div className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-xl hover:shadow-slate-200/50 transition-all duration-500 space-y-6">
-                              <div className="flex items-center justify-between">
-                                <div>
-                                  <h4 className="text-[10px] font-black text-slate-800 uppercase tracking-[0.2em]">Top Conductores</h4>
-                                  <p className="text-[8px] text-slate-400 font-bold uppercase mt-0.5">Mayores contribuyentes al flujo</p>
-                                </div>
-                                <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-500 flex items-center justify-center">
-                                  <Star size={14} />
-                                </div>
-                              </div>
-                              <div className="space-y-3">
-                                {rechargesStats.topDrivers.map((d: any, idx: number) => (
-                                  <div key={`top-recharge-driver-${d.id || d.name || idx}-${idx}`} className="flex items-center justify-between p-3 bg-slate-50/50 rounded-2xl border border-slate-100 hover:border-indigo-100 hover:bg-white transition-all group">
-                                    <div className="flex items-center gap-3">
-                                      <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-[10px] font-black shadow-sm group-hover:rotate-6 transition-transform ${idx === 0 ? 'bg-amber-100 text-amber-600' : 'bg-white text-slate-400'}`}>
-                                        {idx + 1}
-                                      </div>
-                                      <p className="text-[11px] font-black text-slate-700">{d.name}</p>
-                                    </div>
-                                    <p className="text-[11px] font-mono font-black text-indigo-600">${d.total.toLocaleString()}</p>
-                                  </div>
-                                ))}
-                                {rechargesStats.topDrivers.length === 0 && (
-                                  <div className="h-40 flex flex-col items-center justify-center text-slate-300">
-                                    <AlertCircle size={32} strokeWidth={1} className="mb-2 opacity-50" />
-                                    <p className="text-[9px] font-black uppercase tracking-widest">Sin datos suficientes</p>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-
-                          {recargasPendientes.length > 0 && (
-                            <motion.div 
-                              initial={{ opacity: 0, y: -10 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              className="bg-red-50 border border-red-100 p-4 rounded-[2rem] flex items-center gap-4 mb-2"
-                            >
-                              <div className="w-12 h-12 bg-red-500 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-red-100 animate-bounce">
-                                <PlusCircle size={24} />
-                              </div>
-                              <div className="flex-1">
-                                <p className="text-sm font-bold text-red-900">¡Atención Administrador!</p>
-                                <p className="text-[10px] text-red-600 font-medium">Tienes {recargasPendientes.length} recargas esperando tu aprobación inmediata.</p>
-                              </div>
-                            </motion.div>
-                          )}
-                          
-                          <div className="bg-white rounded-[2rem] p-1 border border-slate-100 shadow-sm flex gap-1">
-                            <button 
-                              onClick={() => {
-                                // Podríamos usar un estado interno si quisiéramos, por ahora lo manejamos con scroll o secciones
-                                document.getElementById('pendientes-section')?.scrollIntoView({ behavior: 'smooth' });
-                              }}
-                              className="flex-1 py-3 px-4 rounded-3xl text-[10px] font-bold tracking-[0.1em] uppercase transition-all bg-indigo-600 text-white shadow-lg shadow-indigo-100"
-                            >
-                              Pendientes ({recargasPendientes.length})
-                            </button>
-                            <button 
-                              onClick={() => {
-                                document.getElementById('historial-section')?.scrollIntoView({ behavior: 'smooth' });
-                              }}
-                              className="flex-1 py-3 px-4 rounded-3xl text-[10px] font-bold tracking-[0.1em] uppercase transition-all hover:bg-slate-50 text-slate-400"
-                            >
-                              Historial ({historialRecargas.length})
-                            </button>
-                          </div>
-
-                          <div id="pendientes-section" className="space-y-4 pt-4">
-                            <div className="flex items-center justify-between px-2">
-                              <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">Solicitudes de Saldo</h4>
-                              <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">{recargasPendientes.length} Pendientes</span>
-                            </div>
-                            
-                            {recargasPendientes.length > 0 ? (
-                              <div className="space-y-3">
-                                {recargasPendientes.map((recarga, rIdx) => (
-                                  <motion.div 
-                                    layout
-                                    key={`recarga-pend-${recarga.id || rIdx}-${rIdx}`} 
-                                    className="bg-white p-5 rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-md transition-all group"
-                                  >
-                                    <div className="flex justify-between items-start mb-4">
-                                      <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400 group-hover:bg-indigo-50 group-hover:text-indigo-500 transition-colors">
-                                          <UserIcon size={20} />
-                                        </div>
-                                        <div>
-                                          <p className="text-sm font-bold text-slate-800">{recarga.conductorNombre}</p>
-                                          <p className="text-[10px] text-slate-400">{new Date(recarga.fecha).toLocaleString()}</p>
-                                        </div>
-                                      </div>
-                                      <div className="text-right">
-                                        <p className="text-lg font-mono font-bold text-emerald-600">${recarga.valor.toLocaleString()}</p>
-                                        <button 
-                                          onClick={() => {
-                                            navigator.clipboard.writeText(recarga.nubankKey);
-                                            toast.success("Clave copiada al portapapeles");
-                                          }}
-                                          className="text-[9px] font-bold text-indigo-500 uppercase tracking-tighter hover:underline flex items-center gap-1 justify-end"
-                                        >
-                                          {recarga.nubankKey}
-                                          <PlusCircle size={8} />
-                                        </button>
-                                      </div>
-                                    </div>
-                                    
-                                    <div className="flex gap-2 pt-4 border-t border-slate-50">
-                                      <button 
-                                        onClick={async () => {
-                                          try {
-                                            await aprobarRecarga(recarga.id, recarga.conductorId, recarga.valor, user?.uid);
-                                            toast.success(`Recarga de ${recarga.conductorNombre} aprobada`);
-                                          } catch (error) {
-                                            toast.error("Error al aprobar recarga");
-                                          }
-                                        }}
-                                        className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white text-[10px] font-bold py-3 rounded-xl shadow-lg shadow-emerald-100 transition-all active:scale-95 flex items-center justify-center gap-2"
-                                      >
-                                        <Check size={14} />
-                                        APROBAR RECARGA
-                                      </button>
-                                      <button 
-                                        onClick={async () => {
-                                          try {
-                                            await rechazarRecarga(recarga.id, user?.uid);
-                                            toast.info(`Recarga de ${recarga.conductorNombre} rechazada`);
-                                          } catch (error) {
-                                            toast.error("Error al rechazar recarga");
-                                          }
-                                        }}
-                                        className="w-12 bg-slate-100 hover:bg-red-50 text-slate-400 hover:text-red-500 rounded-xl transition-all flex items-center justify-center border border-slate-200"
-                                        title="Rechazar"
-                                      >
-                                        <X size={18} />
-                                      </button>
-                                    </div>
-
-                                  </motion.div>
-                                ))}
-                              </div>
-                            ) : (
-                              <div className="py-12 text-center bg-slate-50 rounded-[2.5rem] border border-dashed border-slate-200 space-y-3">
-                                <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center mx-auto text-slate-200 shadow-sm">
-                                  <CreditCard size={24} />
-                                </div>
-                                <p className="text-xs text-slate-400 font-medium">No hay recargas esperando aprobación</p>
-                              </div>
-                            )}
-                          </div>
-
-                          <div id="historial-section" className="space-y-4 pt-8 pb-12">
-                            <div className="flex items-center justify-between px-2">
-                              <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">Historial Reciente</h4>
-                              <Clock size={14} className="text-slate-300" />
-                            </div>
-
-                            <div className="space-y-2">
-                              {historialRecargas.filter(r => r.estado !== 'pendiente').map((recarga, rIdx) => (
-                                <motion.div 
-                                  initial={{ opacity: 0 }}
-                                  animate={{ opacity: 1 }}
-                                  key={`recarga-hist-${recarga.id || rIdx}-${rIdx}`} 
-                                  className="bg-white p-4 rounded-3xl border border-slate-100 flex items-center justify-between group"
-                                >
-                                  <div className="flex items-center gap-3">
-                                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${
-                                      recarga.tipo === 'manual' ? 'bg-amber-50 text-amber-500' :
-                                      recarga.tipo === 'ajuste_saldo_usuario' ? 'bg-indigo-50 text-indigo-500' :
-                                      recarga.estado === 'aprobada' ? 'bg-emerald-50 text-emerald-500' : 'bg-red-50 text-red-500'
-                                    }`}>
-                                      {recarga.tipo === 'manual' ? <PlusCircle size={16} /> :
-                                       recarga.tipo === 'ajuste_saldo_usuario' ? <Star size={16} /> :
-                                       recarga.estado === 'aprobada' ? <Check size={16} /> : <X size={16} />}
-                                    </div>
-                                    <div>
-                                      <p className="text-[11px] font-bold text-slate-700">
-                                        {recarga.conductorNombre || recarga.usuarioNombre || 'Sistema'}
-                                      </p>
-                                      <div className="flex items-center gap-2">
-                                        <p className="text-[9px] text-slate-400">{new Date(recarga.fecha).toLocaleString([], { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })}</p>
-                                        <span className="text-[8px] font-black uppercase tracking-tighter opacity-40">•</span>
-                                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">
-                                          {recarga.tipo === 'manual' ? 'Recarga Manual' :
-                                           recarga.tipo === 'ajuste_saldo_usuario' ? 'Ajuste Usuario' :
-                                           recarga.estado === 'aprobada' ? 'Aprobada' : 'Rechazada'}
-                                        </p>
-                                      </div>
-                                    </div>
-                                  </div>
-                                  <div className="text-right">
-                                    <p className={`text-sm font-mono font-bold ${
-                                      recarga.estado === 'aprobada' ? 'text-emerald-500' : 'text-slate-300'
-                                    }`}>
-                                      ${recarga.valor.toLocaleString()}
-                                    </p>
-                                    {recarga.procesadaPor && (
-                                      <p className="text-[8px] text-slate-300 uppercase font-black tracking-tighter">ID: {recarga.procesadaPor.slice(-4)}</p>
-                                    )}
-                                  </div>
-                                </motion.div>
-                              ))}
-
-                              {historialRecargas.filter(r => r.estado !== 'pendiente').length === 0 && (
-                                <div className="py-12 text-center text-slate-300 italic text-[10px]">
-                                  No hay historial disponible
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                      {adminSubTab === 'activacion' && (
-                        <div className="space-y-6">
-                          <AdminDriversPanel adminUid={user?.uid} />
-                        </div>
-                      )}
-
-                      {adminSubTab === 'conductores' && (
-                        <div className="space-y-6">
-                          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-2">
-                            <div className="space-y-1">
-                              <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">Gestión de Flota</h4>
-                              <div className="flex items-center gap-2">
-                                <span className="flex items-center gap-1.5 px-2 py-0.5 bg-emerald-50 text-emerald-600 rounded-lg text-[9px] font-bold border border-emerald-100">
-                                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                  {allDrivers.filter(d => d.activo).length} EN LÍNEA
-                                </span>
-                                <span className="px-2 py-0.5 bg-slate-50 text-slate-400 rounded-lg text-[9px] font-bold border border-slate-100">
-                                  {allDrivers.length} TOTAL
-                                </span>
-                              </div>
-                            </div>
-
-                            <div className="relative group">
-                              <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none text-slate-400 group-focus-within:text-indigo-500 transition-colors">
-                                <Search size={16} />
-                              </div>
-                              <input 
-                                type="text"
-                                placeholder="Buscar conductor o placa..."
-                                value={driverSearchTerm}
-                                onChange={(e) => setDriverSearchTerm(e.target.value)}
-                                className="w-full md:w-64 bg-white border border-slate-100 rounded-2xl py-3 pl-11 pr-4 text-xs font-medium focus:outline-none focus:ring-4 focus:ring-indigo-50/50 focus:border-indigo-200 transition-all shadow-sm"
-                              />
-                            </div>
-                          </div>
-
-                          <div className="grid gap-4">
-                            {allDrivers
-                              .filter(d => 
-                                d.nombre?.toLowerCase().includes(driverSearchTerm.toLowerCase()) || 
-                                d.vehiculo?.placa?.toLowerCase().includes(driverSearchTerm.toLowerCase())
-                              )
-                              .sort((a, b) => (b.activo ? 1 : 0) - (a.activo ? 1 : 0))
-                              .map((cond, cIdx) => (
-                              <motion.div 
-                                layout
-                                key={`driver-item-${cond.id || cIdx}-${cIdx}`} 
-                                className={`bg-white p-6 rounded-[2.5rem] border shadow-sm space-y-5 transition-all group ${cond.activo ? 'border-emerald-100 ring-4 ring-emerald-50/20' : 'border-slate-100'}`}
-                              >
-                                <div className="flex justify-between items-start">
-                                  <div className="flex items-center gap-4">
-                                    <div className="relative">
-                                      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all duration-500 transform group-hover:scale-105 shadow-inner ${
-                                        cond.vehiculo?.tipo === 'taxi'
-                                          ? 'bg-yellow-50 text-yellow-600 border border-yellow-100'
-                                          : cond.activo 
-                                            ? 'bg-emerald-50 text-emerald-600' 
-                                            : 'bg-slate-50 text-slate-400'
-                                      }`}>
-                                        {cond.vehiculo?.tipo?.toLowerCase() === 'taxi' ? <Taxi size={24} /> :
-                                         cond.vehiculo?.tipo?.toLowerCase().includes('moto') ? <Bike size={24} /> : 
-                                         <Car size={24} />}
-                                      </div>
-                                      {cond.activo && (
-                                        <div className={`absolute -top-1 -right-1 w-4 h-4 border-2 border-white rounded-lg shadow-sm ${cond.en_servicio ? 'bg-amber-500' : 'bg-emerald-500'}`} />
-                                      )}
-                                    </div>
-                                    <div className="space-y-1">
-                                      <div className="flex items-center gap-2 flex-wrap">
-                                        <p className="text-base font-bold text-slate-800">{cond.nombre}</p>
-                                        <div className="flex gap-1 items-center flex-wrap">
-                                          {(() => {
-                                            const matchingUser = allUsers.find(u => u.id === cond.id);
-                                            if (matchingUser?.rol === 'ambos') {
-                                              return (
-                                                <span className="text-[8px] font-black bg-amber-500/10 text-amber-600 border border-amber-500/20 px-2 py-0.5 rounded-full uppercase tracking-tighter">
-                                                  Ambos (Pasajero/Conductor)
-                                                </span>
-                                              );
-                                            } else if (matchingUser?.rol === 'conductor') {
-                                              return (
-                                                <span className="text-[8px] font-black bg-indigo-500/10 text-indigo-600 border border-indigo-500/20 px-2 py-0.5 rounded-full uppercase tracking-tighter">
-                                                  Solo Conductor
-                                                </span>
-                                              );
-                                            } else if (matchingUser?.rol === 'admin' || matchingUser?.rol === 'admin_suplente') {
-                                              return (
-                                                <span className="text-[8px] font-black bg-purple-500/10 text-purple-600 border border-purple-500/20 px-2 py-0.5 rounded-full uppercase tracking-tighter">
-                                                  Admin Conductor
-                                                </span>
-                                              );
-                                            } else {
-                                              return (
-                                                <span className="text-[8px] font-black bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 px-2 py-0.5 rounded-full uppercase tracking-tighter">
-                                                  Conductor
-                                                </span>
-                                              );
-                                            }
-                                          })()}
-
-                                          {cond.aprobado === false && (
-                                            <span className="text-[8px] font-black bg-amber-500 text-white px-2 py-0.5 rounded-full uppercase tracking-tighter shadow-sm shadow-amber-100">Esperando Verificación</span>
-                                          )}
-                                          {cond.bloqueado ? (
-                                            <AdminDriverBlockBadge cond={cond} />
-                                          ) : cond.activo ? (
-                                            <>
-                                              <span className="text-[8px] font-black bg-emerald-500 text-white px-2 py-0.5 rounded-full uppercase tracking-tighter shadow-sm shadow-emerald-100">En Línea</span>
-                                              {cond.en_servicio ? (
-                                                <span className="text-[8px] font-black bg-amber-500 text-white px-2 py-0.5 rounded-full uppercase tracking-tighter shadow-sm shadow-amber-100 animate-pulse">En Ruta</span>
-                                              ) : (
-                                                <span className="text-[8px] font-black bg-indigo-500 text-white px-2 py-0.5 rounded-full uppercase tracking-tighter shadow-sm shadow-indigo-100">Esperando</span>
-                                              )}
-                                            </>
-                                          ) : (
-                                            <span className="text-[8px] font-black bg-slate-200 text-slate-500 px-2 py-0.5 rounded-full uppercase tracking-tighter">Desconectado</span>
-                                          )}
-                                        </div>
-                                      </div>
-                                      <div className="flex items-center gap-2">
-                                        <p className="text-[10px] text-slate-500 font-bold tracking-tighter bg-slate-50 px-2 py-0.5 rounded-md border border-slate-100">{cond.vehiculo?.placa}</p>
-                                        <span className="text-[10px] text-slate-400 font-medium">•</span>
-                                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter flex items-center gap-1">
-                                          {cond.vehiculo?.tipo?.toLowerCase() === 'taxi' ? 'Taxi' :
-                                           cond.vehiculo?.tipo?.toLowerCase().includes('moto') ? 'Motocicleta' : 
-                                           ['camion_flete', 'camion_acarreo', 'motocarro'].includes(cond.vehiculo?.tipo) ? 'Carga' :
-                                           'Automóvil'}
-                                        </p>
-                                        <span className="text-[10px] text-slate-400 font-medium">•</span>
-                                        <p className="text-[10px] text-indigo-500 font-bold uppercase tracking-tighter flex items-center gap-1">
-                                          <MapPin size={10} />
-                                          {cond.ciudad || 'N/A'}
-                                        </p>
-                                      </div>
-                                    </div>
-                                  </div>
-                                  <div className="text-right">
-                                    <p className="text-lg font-mono font-bold text-emerald-600">${cond.tarjeta_virtual?.toLocaleString()}</p>
-                                    <div className="flex items-center gap-0.5 text-[10px] font-bold text-amber-500 justify-end mt-1">
-                                      <Star size={12} fill="currentColor" />
-                                      {cond.calificacion?.toFixed(1) || '5.0'}
-                                      <span className="text-slate-300 ml-1 text-[9px] font-medium opacity-50">({cond.servicios_completados || 0})</span>
-                                    </div>
-                                  </div>
-                                </div>
-
-                                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-                                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 sm:col-span-1">
-                                    <p className="text-[9px] uppercase font-bold text-slate-400 mb-3 tracking-[0.1em]">Documentos</p>
-                                    <div className="flex gap-1.5 flex-wrap">
-                                      {['licencia', 'soat', 'cedula'].map((docType, dIdx) => (
-                                        <button
-                                          key={`doc-type-${cond.id || cIdx}-${docType}-${dIdx}`}
-                                          onClick={() => {
-                                            const newDocs = { ...cond.documentos_autorizados, [docType]: !cond.documentos_autorizados?.[docType] };
-                                            updateDoc(doc(db, 'conductores', cond.id), { documentos_autorizados: newDocs });
-                                            toast.info(`${docType.toUpperCase()} actualizado`);
-                                          }}
-                                          className={`px-2 py-1 rounded-lg text-[8px] font-bold uppercase transition-all ${cond.documentos_autorizados?.[docType] ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-100/50' : 'bg-white text-slate-400 border border-slate-200'}`}
-                                        >
-                                          {docType}
-                                        </button>
-                                      ))}
-                                    </div>
-                                  </div>
-                                  
-                                  <div className="sm:col-span-3 flex gap-2">
-                                    <button 
-                                      onClick={() => {
-                                        setAdminMessageTarget({ id: cond.id, nombre: cond.nombre, type: 'conductor' });
-                                        setShowAdminMessageModal(true);
-                                      }}
-                                      className="flex-1 bg-white hover:bg-slate-50 text-slate-500 text-[10px] font-bold rounded-2xl border border-slate-200 transition-all active:scale-95 flex flex-col items-center justify-center gap-1.5"
-                                    >
-                                      <MessageCircle size={18} className="text-indigo-400" />
-                                      MENSAJE
-                                    </button>
-                                    <button 
-                                      onClick={() => {
-                                        const phone = cleanPhone(cond.telefono || cond.celular);
-                                        if (phone) {
-                                          window.open(`https://wa.me/${phone}?text=Hola+${encodeURIComponent(cond.nombre || '')},+te+escribo+de+Ruedas+Rápidas.`, '_blank');
-                                        } else {
-                                          toast.error(`No hay un número de WhatsApp o celular registrado para ${cond.nombre || 'este conductor'}`);
-                                        }
-                                      }}
-                                      className="flex-1 bg-white hover:bg-emerald-50 text-emerald-600 text-[10px] font-bold rounded-2xl border border-slate-200 transition-all active:scale-95 flex flex-col items-center justify-center gap-1.5"
-                                    >
-                                      <MessageCircle size={18} />
-                                      WHATSAPP
-                                    </button>
-                                    <button 
-                                      onClick={() => {
-                                        setAdminActionType('edit_saldo_conductor');
-                                        setAdminActionTarget(cond);
-                                        setAdminActionValue(String(cond.tarjeta_virtual || 0));
-                                        setShowAdminActionModal(true);
-                                      }}
-                                      className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-bold rounded-2xl shadow-lg shadow-indigo-100 transition-all active:scale-95 flex flex-col items-center justify-center gap-1.5 border border-indigo-500"
-                                    >
-                                      <CreditCard size={18} />
-                                      SALDO
-                                    </button>
-                                    <button 
-                                      onClick={() => {
-                                        setAdminActionType('confirm_bloqueo_conductor');
-                                        setAdminActionTarget(cond);
-                                        setShowAdminActionModal(true);
-                                      }}
-                                      className={`flex-1 rounded-2xl transition-all active:scale-95 flex flex-col items-center justify-center gap-1.5 text-[10px] font-bold border ${cond.bloqueado ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-rose-50 text-rose-600 border-rose-100'}`}
-                                    >
-                                      {cond.bloqueado ? <Unlock size={18} /> : <Lock size={18} />}
-                                      {cond.bloqueado ? 'HABILITAR' : 'BLOQUEAR'}
-                                    </button>
-                                    <button 
-                                      onClick={() => {
-                                        abrirModalEliminar({
-                                          id: cond.id,
-                                          tipo: 'conductor',
-                                          nombre: cond.nombre || 'Conductor sin nombre',
-                                          telefono: cond.telefono || cond.celular,
-                                          motivoSugerido: cond.bloqueado 
-                                            ? 'Conductor bloqueado por spam o infracción' 
-                                            : ((cond.servicios_completados || 0) === 0 
-                                                ? 'Conductor inactivo sin viajes completados' 
-                                                : 'Depuración a criterio del administrador'),
-                                          detalles: `Placa: ${cond.vehiculo?.placa || 'N/A'} • Servicios: ${cond.servicios_completados || 0} • Saldo: $${(cond.tarjeta_virtual || 0).toLocaleString()} COP • Ciudad: ${cond.ciudad || 'N/A'}`
-                                        });
-                                      }}
-                                      className="flex-1 rounded-2xl transition-all active:scale-95 flex flex-col items-center justify-center gap-1.5 text-[10px] font-bold border border-rose-200 bg-rose-50/70 hover:bg-rose-100 text-rose-600 cursor-pointer"
-                                      title="Eliminar conductor inactivo o spam"
-                                    >
-                                      <Trash2 size={18} />
-                                      ELIMINAR
-                                    </button>
-                                  </div>
-
-                                  {/* Action Toggle - Document Verification / Approval */}
-                                  <div className="sm:col-span-3 mt-4 p-5 bg-amber-50 border border-amber-100 rounded-[2.5rem]">
-                                    <div className="flex items-center justify-between gap-4">
-                                      <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 bg-amber-100 rounded-2xl flex items-center justify-center text-amber-600 shrink-0">
-                                          <FileText size={20} />
-                                        </div>
-                                        <div>
-                                          <p className="text-[10px] font-black text-amber-600 uppercase tracking-widest">Aprobación General</p>
-                                          <p className="text-[9px] text-amber-500 font-medium">
-                                            {cond.aprobado !== false ? 'Conductor validado y aprobado' : 'Esperando verificación de documentos'}
-                                          </p>
-                                        </div>
-                                      </div>
-                                      <button 
-                                        onClick={async () => {
-                                          const newState = cond.aprobado === false ? true : false;
-                                          await updateDoc(doc(db, 'conductores', cond.id), { aprobado: newState });
-                                          toast.success(newState ? "Conductor Aprobado" : "Conductor puesto en Espera");
-                                        }}
-                                        className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase transition-all shadow-sm shrink-0 ${
-                                          cond.aprobado !== false 
-                                          ? 'bg-rose-100 text-rose-600 hover:bg-rose-200 border border-rose-200' 
-                                          : 'bg-emerald-600 text-white hover:bg-emerald-700'
-                                        }`}
-                                      >
-                                        {cond.aprobado !== false ? 'Desaprobar' : 'Validar y Aprobar'}
-                                      </button>
-                                    </div>
-                                  </div>
-
-                                  {/* Action Toggle - Expreso Authorization */}
-                                  <div className="sm:col-span-3 mt-4 p-5 bg-indigo-50 border border-indigo-100 rounded-[2.5rem] mb-2">
-                                    <div className="flex items-center justify-between">
-                                      <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 bg-indigo-100 rounded-2xl flex items-center justify-center text-indigo-600">
-                                          <ShieldCheck size={20} />
-                                        </div>
-                                        <div>
-                                          <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">Servicio Expreso</p>
-                                          <p className="text-[9px] text-indigo-400 font-medium">{cond.expreso_habilitado ? 'Habilitado para viajes expresos' : 'Autorización especial requerida'}</p>
-                                        </div>
-                                      </div>
-                                      <button 
-                                        onClick={() => {
-                                          const newState = !cond.expreso_habilitado;
-                                          updateDoc(doc(db, 'conductores', cond.id), { expreso_habilitado: newState });
-                                          toast.success(newState ? "Habilitado para Expreso" : "Habilitación revocada");
-                                        }}
-                                        className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase transition-all shadow-sm ${
-                                          cond.expreso_habilitado 
-                                          ? 'bg-rose-100 text-rose-600 hover:bg-rose-200' 
-                                          : 'bg-indigo-600 text-white hover:bg-indigo-700'
-                                        }`}
-                                      >
-                                        {cond.expreso_habilitado ? 'Revocar' : 'Habilitar'}
-                                      </button>
-                                    </div>
-                                  </div>
-                                </div>
-                              </motion.div>
-                            ))}
-                            
-                            {allDrivers.filter(d => 
-                                d.nombre?.toLowerCase().includes(driverSearchTerm.toLowerCase()) || 
-                                d.vehiculo?.placa?.toLowerCase().includes(driverSearchTerm.toLowerCase())
-                            ).length === 0 && (
-                              <div className="py-20 text-center bg-slate-50 rounded-[3rem] border-2 border-dashed border-slate-100 space-y-4">
-                                <div className="w-16 h-16 bg-white rounded-3xl flex items-center justify-center mx-auto text-slate-200 shadow-sm">
-                                  <Car size={32} />
-                                </div>
-                                <div className="space-y-1">
-                                  <p className="text-sm font-bold text-slate-400">No se encontraron conductores</p>
-                                  <p className="text-[10px] text-slate-300 px-8 mx-auto max-w-xs">Verifica placa o nombre.</p>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      )}
-
-                      {adminSubTab === 'usuarios' && (
-                        <div className="space-y-6">
-                          {unattendedTrips.length > 0 && (
-                            <motion.div 
-                              initial={{ opacity: 0, y: -20 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              className="bg-rose-50 border border-rose-100 p-4 rounded-[2rem] flex items-center gap-3 shadow-sm"
-                            >
-                              <div className="w-10 h-10 bg-rose-500 text-white rounded-xl flex items-center justify-center animate-pulse">
-                                <AlertTriangle size={20} />
-                              </div>
-                              <div>
-                                <p className="text-sm font-bold text-rose-800">{unattendedTrips.length} servicios sin atender</p>
-                                <p className="text-[10px] text-rose-600 font-medium">Hay solicitudes pendientes hace más de 5 minutos.</p>
-                              </div>
-                              <button 
-                                onClick={() => setAdminSubTab('espera')}
-                                className="ml-auto bg-rose-500 text-white text-[10px] font-bold px-4 py-2 rounded-xl"
-                              >
-                                VER TODOS
-                              </button>
-                            </motion.div>
-                          )}
-
-                          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-2">
-                            <div className="space-y-1">
-                              <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">Base de Usuarios</h4>
-                              <p className="text-[11px] text-slate-500 font-medium">{allUsers.filter(u => u.rol !== 'marca_aliada').length} registros totales</p>
-                            </div>
-                            
-                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                              {/* Filter Pills */}
-                              <div className="flex items-center bg-slate-100 p-1 rounded-2xl gap-1 text-[10px] font-bold">
-                                <button
-                                  onClick={() => setUserPromoFilter('todos')}
-                                  className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer ${userPromoFilter === 'todos' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
-                                >
-                                  Todos
-                                </button>
-                                <button
-                                  onClick={() => setUserPromoFilter('sin_bono')}
-                                  className={`px-3 py-1.5 rounded-xl transition-all flex items-center gap-1 cursor-pointer ${userPromoFilter === 'sin_bono' ? 'bg-amber-500 text-white shadow-sm font-black' : 'text-slate-500 hover:text-amber-600'}`}
-                                >
-                                  🎁 Sin Bono ($0)
-                                </button>
-                                <button
-                                  onClick={() => setUserPromoFilter('con_bono')}
-                                  className={`px-3 py-1.5 rounded-xl transition-all flex items-center gap-1 cursor-pointer ${userPromoFilter === 'con_bono' ? 'bg-emerald-600 text-white shadow-sm font-black' : 'text-slate-500 hover:text-emerald-600'}`}
-                                >
-                                  ⚡ Con Bono
-                                </button>
-                              </div>
-
-                              <div className="relative group">
-                                <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none text-slate-400 group-focus-within:text-indigo-500 transition-colors">
-                                  <Search size={16} />
-                                </div>
-                                <input 
-                                  type="text"
-                                  placeholder="Buscar por nombre o email..."
-                                  value={userSearchTerm}
-                                  onChange={(e) => setUserSearchTerm(e.target.value)}
-                                  className="w-full md:w-64 bg-white border border-slate-100 rounded-2xl py-3 pl-11 pr-4 text-xs font-medium focus:outline-none focus:ring-4 focus:ring-indigo-50/50 focus:border-indigo-200 transition-all shadow-sm"
-                                />
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="grid gap-3">
-                            {allUsers
-                              .filter(u => {
-                                if (u.rol === 'marca_aliada') return false;
-                                const matchesSearch = u.nombre?.toLowerCase().includes(userSearchTerm.toLowerCase()) || 
-                                                     u.email?.toLowerCase().includes(userSearchTerm.toLowerCase());
-                                if (!matchesSearch) return false;
-
-                                if (userPromoFilter === 'sin_bono') {
-                                  return (u.saldo_promo || 0) === 0;
-                                }
-                                if (userPromoFilter === 'con_bono') {
-                                  return (u.saldo_promo || 0) > 0;
-                                }
-                                return true;
-                              })
-                              .map((u, uIdx) => (
-                              <div key={`user-item-${u.id || uIdx}-${uIdx}`} className="space-y-1">
-                                <motion.div 
-                                  layout
-                                  className="bg-white p-5 rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-md transition-all duration-500 relative flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 group z-10"
-                                >
-                                  <div className="flex items-center gap-4">
-                                    <div className="relative">
-                                      <div className="w-14 h-14 rounded-2xl flex items-center justify-center transition-all duration-500 transform shadow-inner bg-slate-50 text-slate-400 group-hover:bg-indigo-50 group-hover:text-indigo-500 group-hover:rotate-3">
-                                        <UserIcon size={24} />
-                                      </div>
-                                      <div className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-lg border-2 border-white flex items-center justify-center shadow-sm ${
-                                        u.rol === 'admin' 
-                                          ? 'bg-indigo-500 text-white' 
-                                          : u.rol === 'admin_suplente'
-                                            ? 'bg-amber-500 text-white'
-                                            : 'bg-emerald-500 text-white'
-                                      }`}>
-                                        <Shield size={10} />
-                                      </div>
-                                    </div>
-                                    <div className="space-y-1">
-                                      <div className="flex items-center gap-2 flex-wrap">
-                                        <p className="text-base font-bold text-slate-800">{u.nombre}</p>
-                                        {u.rol === 'admin' && (
-                                          <span className="bg-purple-50 text-purple-700 text-[8px] font-black uppercase px-2 py-0.5 rounded-full border border-purple-200 flex items-center gap-1">
-                                            <Shield size={8} /> ADMINISTRADOR
-                                          </span>
-                                        )}
-                                        {u.rol === 'admin_suplente' && (
-                                          <span className="bg-amber-50 text-amber-700 text-[8px] font-black uppercase px-2 py-0.5 rounded-full border border-amber-200 flex items-center gap-1">
-                                            <Shield size={8} /> SUPLENTE
-                                          </span>
-                                        )}
-                                        {u.rol === 'conductor' && (
-                                          <span className="bg-indigo-50 text-indigo-700 text-[8px] font-black uppercase px-2 py-0.5 rounded-full border border-indigo-200 flex items-center gap-1">
-                                            <Car size={8} /> CONDUCTOR
-                                          </span>
-                                        )}
-                                        {u.rol === 'ambos' && (
-                                          <span className="bg-orange-50 text-orange-700 text-[8px] font-black uppercase px-2 py-0.5 rounded-full border border-orange-200 flex items-center gap-1">
-                                            <UserIcon size={8} /> + <Car size={8} /> AMBOS (PASAJERO / CONDUCTOR)
-                                          </span>
-                                        )}
-                                        {u.rol === 'usuario' && (
-                                          <span className="bg-emerald-50 text-emerald-700 text-[8px] font-black uppercase px-2 py-0.5 rounded-full border border-emerald-200 flex items-center gap-1">
-                                            <UserIcon size={8} /> PASAJERO
-                                          </span>
-                                        )}
-                                        {(u.saldo_promo || 0) === 0 && (
-                                          <span className="bg-amber-50 text-amber-700 text-[8px] font-black uppercase px-2 py-0.5 rounded-full border border-amber-200 flex items-center gap-1">
-                                            🎁 SIN BONO INICIAL
-                                          </span>
-                                        )}
-                                        {u.bloqueado && (
-                                          <span className="bg-red-50 text-red-500 text-[8px] font-black uppercase px-2 py-0.5 rounded-full border border-red-100">Bloqueado</span>
-                                        )}
-                                      </div>
-                                      <p className="text-[10px] text-slate-400 font-medium tracking-tight flex items-center gap-1.5 flex-wrap">
-                                        <span>{u.email}</span>
-                                        {(u.celular || u.telefono) && (
-                                          <>
-                                            <span className="text-slate-300">•</span>
-                                            <span className="font-mono text-emerald-600 bg-emerald-50/50 px-2 py-0.5 rounded-lg text-[9px] font-bold">
-                                              📱 {u.celular || u.telefono}
-                                            </span>
-                                          </>
-                                        )}
-                                      </p>
-                                      <div className="flex items-center gap-2 mt-1 flex-wrap">
-                                        <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg ${
-                                          (u.saldo_promo || 0) > 0 
-                                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-100 font-bold' 
-                                            : 'bg-slate-100 text-slate-400 font-medium'
-                                        }`}>
-                                          <CreditCard size={10} className={(u.saldo_promo || 0) > 0 ? "text-emerald-500" : "text-slate-400"} />
-                                          <p className="text-[10px]">Bono Promo: ${(u.saldo_promo || 0).toLocaleString()} COP</p>
-                                        </div>
-                                        <div className="flex items-center gap-1.5 px-2 py-1 bg-amber-50/50 rounded-lg">
-                                          <Navigation size={10} className="text-amber-400" />
-                                          <p className="text-[10px] font-bold text-amber-600">{u.servicios_count || 0} Exitosos</p>
-                                        </div>
-                                        <div className="flex items-center gap-1.5 px-2 py-1 bg-rose-50/50 rounded-lg" title="Servicios cancelados o no atendidos">
-                                          <X size={10} className="text-rose-400" />
-                                          <p className="text-[10px] font-bold text-rose-600">{u.servicios_perdidos || 0} Perdidos</p>
-                                        </div>
-                                        <div className="flex items-center gap-1.5 px-2 py-1 bg-emerald-50/50 rounded-lg">
-                                          <MapPin size={10} className="text-emerald-400" />
-                                          <p className="text-[10px] font-bold text-emerald-600">{u.ciudad || 'N/A'}</p>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  </div>
-
-                                  <div className="flex items-center gap-2 w-full sm:w-[32rem] mt-2 sm:mt-0 pt-4 sm:pt-0 border-t sm:border-0 border-slate-50">
-                                    <div className="flex gap-2 w-full">
-                                      <button 
-                                        onClick={() => {
-                                          setAdminMessageTarget({ id: u.id, nombre: u.nombre, type: 'usuario' });
-                                          setShowAdminMessageModal(true);
-                                        }}
-                                        className="flex-1 bg-white hover:bg-slate-50 text-slate-500 text-[10px] font-bold py-3 px-2 rounded-2xl border border-slate-200 transition-all active:scale-95 flex flex-col items-center justify-center gap-1.5 cursor-pointer"
-                                      >
-                                        <MessageCircle size={18} className="text-indigo-400" />
-                                        MENSAJE
-                                      </button>
-                                      <button 
-                                        onClick={() => {
-                                          const phone = cleanPhone(u.celular || u.telefono);
-                                          if (phone) {
-                                            window.open(`https://wa.me/${phone}?text=Hola+${encodeURIComponent(u.nombre || '')},+te+escribo+de+Ruedas+Rápidas.`, '_blank');
-                                          } else {
-                                            toast.error(`No hay un número de WhatsApp o celular registrado para ${u.nombre || 'este usuario'}`);
-                                          }
-                                        }}
-                                        className="flex-1 bg-white hover:bg-emerald-50 text-emerald-600 text-[10px] font-bold py-3 px-2 rounded-2xl border border-slate-200 transition-all active:scale-95 flex flex-col items-center justify-center gap-1.5 cursor-pointer text-center"
-                                      >
-                                        <MessageCircle size={18} />
-                                        WHATSAPP
-                                      </button>
-                                      <button 
-                                        onClick={() => {
-                                          setAdminActionType('edit_saldo_usuario');
-                                          setAdminActionTarget(u);
-                                          // Prefill with 10,000 if currently 0 for ultra-fast 1-click bonus assignment
-                                          setAdminActionValue(u.saldo_promo ? String(u.saldo_promo) : '10000');
-                                          setShowAdminActionModal(true);
-                                        }}
-                                        className={`flex-1 text-[10px] font-bold py-3 px-2 rounded-2xl shadow-lg transition-all active:scale-95 flex flex-col items-center justify-center gap-1.5 cursor-pointer ${
-                                          (u.saldo_promo || 0) === 0
-                                            ? 'bg-gradient-to-r from-emerald-600 to-indigo-600 hover:from-emerald-700 hover:to-indigo-700 text-white shadow-emerald-200 border border-emerald-400 animate-pulse'
-                                            : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-100 border border-indigo-500'
-                                        }`}
-                                      >
-                                        <CreditCard size={18} />
-                                        {(u.saldo_promo || 0) === 0 ? '🎁 ASIGNAR BONO' : 'SALDO PROMO'}
-                                      </button>
-                                      <button 
-                                        onClick={() => {
-                                          setAdminActionType('confirm_bloqueo_usuario');
-                                          setAdminActionTarget(u);
-                                          setShowAdminActionModal(true);
-                                        }}
-                                        className={`flex-1 rounded-2xl transition-all active:scale-95 flex flex-col items-center justify-center gap-1.5 text-[10px] font-bold border cursor-pointer py-3 px-2 ${
-                                          u.bloqueado 
-                                            ? 'bg-emerald-50 text-emerald-600 border-emerald-100' 
-                                            : 'bg-rose-50 text-rose-600 border-rose-100'
-                                        }`}
-                                      >
-                                        {u.bloqueado ? <Unlock size={18} /> : <Lock size={18} />}
-                                        {u.bloqueado ? 'HABILITAR' : 'BLOQUEAR'}
-                                      </button>
-                                      {u.rol !== 'admin' && (
-                                        <button 
-                                          onClick={() => {
-                                            setAdminActionType('toggle_suplente');
-                                            setAdminActionTarget(u);
-                                            setShowAdminActionModal(true);
-                                          }}
-                                          className={`flex-1 rounded-2xl transition-all active:scale-95 flex flex-col items-center justify-center gap-1.5 text-[10px] font-bold border cursor-pointer py-3 px-2 ${
-                                            u.rol === 'admin_suplente' 
-                                              ? 'bg-amber-50 text-amber-700 border-amber-200' 
-                                              : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
-                                          }`}
-                                        >
-                                          <Shield size={18} className={u.rol === 'admin_suplente' ? 'text-amber-500' : 'text-slate-400'} />
-                                          {u.rol === 'admin_suplente' ? 'QUITAR SUPLENTE' : 'HACER SUPLENTE'}
-                                        </button>
-                                      )}
-                                      {u.rol !== 'admin' && u.id !== user?.uid && u.email !== 'darwin.barbosa000@gmail.com' && u.email !== 'ruedasrapidasviajaseguro@gmail.com' && (
-                                        <button 
-                                          onClick={() => {
-                                            abrirModalEliminar({
-                                              id: u.id,
-                                              tipo: 'usuario',
-                                              nombre: u.nombre || 'Usuario sin nombre',
-                                              email: u.email,
-                                              telefono: u.celular || u.telefono,
-                                              motivoSugerido: u.bloqueado 
-                                                ? 'Usuario bloqueado por spam o reporte' 
-                                                : (((u.servicios_count || 0) === 0 && (u.servicios_perdidos || 0) === 0) 
-                                                    ? 'Usuario inactivo (0 viajes registrados)' 
-                                                    : 'Depuración a criterio del administrador'),
-                                              detalles: `Email: ${u.email || 'N/A'} • Viajes: ${u.servicios_count || 0} • Bono: $${(u.saldo_promo || 0).toLocaleString()} COP • Ciudad: ${u.ciudad || 'N/A'}`
-                                            });
-                                          }}
-                                          className="flex-1 rounded-2xl transition-all active:scale-95 flex flex-col items-center justify-center gap-1.5 text-[10px] font-bold border border-rose-200 bg-rose-50/70 hover:bg-rose-100 text-rose-600 cursor-pointer py-3 px-2"
-                                          title="Eliminar usuario inactivo o spam"
-                                        >
-                                          <Trash2 size={18} />
-                                          ELIMINAR
-                                        </button>
-                                      )}
-                                    </div>
-                                  </div>
-                                </motion.div>
-                              </div>
-                            ))}
-                            
-                            {allUsers.filter(u => 
-                              u.rol !== 'marca_aliada' && (
-                                u.nombre?.toLowerCase().includes(userSearchTerm.toLowerCase()) || 
-                                u.email?.toLowerCase().includes(userSearchTerm.toLowerCase())
-                              )
-                            ).length === 0 && (
-                              <div className="py-20 text-center bg-slate-50 rounded-[3rem] border-2 border-dashed border-slate-100 space-y-4">
-                                <div className="w-16 h-16 bg-white rounded-3xl flex items-center justify-center mx-auto text-slate-200 shadow-sm">
-                                  <UserIcon size={32} />
-                                </div>
-                                <div className="space-y-1">
-                                  <p className="text-sm font-bold text-slate-400">No se encontraron usuarios</p>
-                                  <p className="text-[10px] text-slate-300 px-8 mx-auto max-w-xs">Intenta con otros términos de búsqueda o verifica que el registro exista.</p>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      )}
-
-                      {adminSubTab === 'soporte' && (
-                        <div className="space-y-4">
-                          <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] px-2">Chats de Soporte</h4>
-                          <div className="space-y-3">
-                            {supportChats.length === 0 ? (
-                              <div className="bg-white p-10 rounded-[2.5rem] border border-slate-100 text-center space-y-3">
-                                <div className="w-16 h-16 bg-slate-50 rounded-3xl flex items-center justify-center mx-auto text-slate-300">
-                                  <Headphones size={32} />
-                                </div>
-                                <p className="text-sm font-bold text-slate-400">No hay chats de soporte activos</p>
-                              </div>
-                            ) : (
-                              supportChats.map((chat, cIdx) => (
-                                <button 
-                                  key={`support-chat-${chat.conductorId || cIdx}-${cIdx}`}
-                                  onClick={() => {
-                                    setActiveSupportConductor({ id: chat.conductorId, nombre: chat.conductorNombre });
-                                    setShowSupportChat(true);
-                                  }}
-                                  className="w-full bg-white p-5 rounded-[2rem] border border-slate-100 shadow-sm flex items-center justify-between hover:border-blue-200 transition-all group text-left"
-                                >
-                                  <div className="flex items-center gap-4">
-                                    <div className="relative">
-                                      <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600 font-bold text-lg">
-                                        {(chat.conductorNombre || "?").charAt(0)}
-                                      </div>
-                                      {!chat.leidoPorAdmin && (
-                                        <span className="absolute -top-1 -right-1 w-4 h-4 bg-blue-600 border-2 border-white rounded-full animate-pulse" />
-                                      )}
-                                    </div>
-                                    <div>
-                                      <h5 className="text-sm font-bold text-slate-800">{chat.conductorNombre}</h5>
-                                      <p className="text-[10px] text-slate-400 font-medium truncate max-w-[150px]">{chat.ultimaMensaje}</p>
-                                    </div>
-                                  </div>
-                                  <div className="text-right space-y-1">
-                                    <p className="text-[9px] font-bold text-slate-400 uppercase">
-                                      {chat.ultimaFecha?.toDate ? new Date(chat.ultimaFecha.toDate()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '...'}
-                                    </p>
-                                    <div className="flex items-center gap-1.5 justify-end">
-                                      {!chat.leidoPorAdmin && (
-                                        <span className="text-[7px] font-black bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-md uppercase">Nuevo</span>
-                                      )}
-                                      <ChevronRight size={14} className="text-slate-300 group-hover:text-blue-500 transition-colors" />
-                                    </div>
-                                  </div>
-                                </button>
-                              ))
-                            )}
-                          </div>
-                        </div>
-                      )}
-
-                      {adminSubTab === 'aliados' && (
-                        <div className="space-y-6">
-                          {/* KPI & Moderation Ribbon */}
-                          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                            <button
-                              onClick={() => setAdminAliadosFilter('pendientes')}
-                              className={`p-4 rounded-3xl border text-left transition-all relative overflow-hidden group cursor-pointer ${
-                                adminAliadosFilter === 'pendientes'
-                                  ? 'bg-amber-500 text-white border-amber-600 shadow-lg shadow-amber-500/20'
-                                  : 'bg-white text-slate-700 border-slate-100 hover:border-amber-200 shadow-sm'
-                              }`}
-                            >
-                              <div className="flex items-center justify-between mb-2">
-                                <span className={`text-[9px] font-black uppercase tracking-wider ${adminAliadosFilter === 'pendientes' ? 'text-amber-100' : 'text-amber-600'}`}>
-                                  En Espera Anti-Spam
-                                </span>
-                                <div className={`w-7 h-7 rounded-xl flex items-center justify-center ${adminAliadosFilter === 'pendientes' ? 'bg-white/20 text-white' : 'bg-amber-50 text-amber-500'}`}>
-                                  <Clock size={14} className={marcasAliadas.filter(isMarcaPendiente).length > 0 ? "animate-spin" : ""} />
-                                </div>
-                              </div>
-                              <div className="flex items-baseline gap-2">
-                                <p className="text-2xl font-mono font-black">
-                                  {marcasAliadas.filter(isMarcaPendiente).length}
-                                </p>
-                                {marcasAliadas.filter(isMarcaPendiente).length > 0 && (
-                                  <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded-full ${adminAliadosFilter === 'pendientes' ? 'bg-white text-amber-600' : 'bg-amber-100 text-amber-700'}`}>
-                                    ¡Por Revisar!
-                                  </span>
-                                )}
-                              </div>
-                            </button>
-
-                            <button
-                              onClick={() => setAdminAliadosFilter('aprobados')}
-                              className={`p-4 rounded-3xl border text-left transition-all relative overflow-hidden group cursor-pointer ${
-                                adminAliadosFilter === 'aprobados'
-                                  ? 'bg-emerald-600 text-white border-emerald-700 shadow-lg shadow-emerald-600/20'
-                                  : 'bg-white text-slate-700 border-slate-100 hover:border-emerald-200 shadow-sm'
-                              }`}
-                            >
-                              <div className="flex items-center justify-between mb-2">
-                                <span className={`text-[9px] font-black uppercase tracking-wider ${adminAliadosFilter === 'aprobados' ? 'text-emerald-100' : 'text-emerald-600'}`}>
-                                  Aprobadas y Activas
-                                </span>
-                                <div className={`w-7 h-7 rounded-xl flex items-center justify-center ${adminAliadosFilter === 'aprobados' ? 'bg-white/20 text-white' : 'bg-emerald-50 text-emerald-500'}`}>
-                                  <CheckCheck size={14} />
-                                </div>
-                              </div>
-                              <p className="text-2xl font-mono font-black">
-                                {marcasAliadas.filter(isMarcaAprobada).length}
-                              </p>
-                            </button>
-
-                            <button
-                              onClick={() => setAdminAliadosFilter('rechazados')}
-                              className={`p-4 rounded-3xl border text-left transition-all relative overflow-hidden group cursor-pointer ${
-                                adminAliadosFilter === 'rechazados'
-                                  ? 'bg-rose-600 text-white border-rose-700 shadow-lg shadow-rose-600/20'
-                                  : 'bg-white text-slate-700 border-slate-100 hover:border-rose-200 shadow-sm'
-                              }`}
-                            >
-                              <div className="flex items-center justify-between mb-2">
-                                <span className={`text-[9px] font-black uppercase tracking-wider ${adminAliadosFilter === 'rechazados' ? 'text-rose-100' : 'text-rose-600'}`}>
-                                  Rechazadas / Spam
-                                </span>
-                                <div className={`w-7 h-7 rounded-xl flex items-center justify-center ${adminAliadosFilter === 'rechazados' ? 'bg-white/20 text-white' : 'bg-rose-50 text-rose-500'}`}>
-                                  <Ban size={14} />
-                                </div>
-                              </div>
-                              <p className="text-2xl font-mono font-black">
-                                {marcasAliadas.filter(isMarcaRechazada).length}
-                              </p>
-                            </button>
-
-                            <button
-                              onClick={() => setAdminAliadosFilter('todos')}
-                              className={`p-4 rounded-3xl border text-left transition-all relative overflow-hidden group cursor-pointer ${
-                                adminAliadosFilter === 'todos'
-                                  ? 'bg-indigo-600 text-white border-indigo-700 shadow-lg shadow-indigo-600/20'
-                                  : 'bg-white text-slate-700 border-slate-100 hover:border-indigo-200 shadow-sm'
-                              }`}
-                            >
-                              <div className="flex items-center justify-between mb-2">
-                                <span className={`text-[9px] font-black uppercase tracking-wider ${adminAliadosFilter === 'todos' ? 'text-indigo-100' : 'text-indigo-600'}`}>
-                                  Total Comercios
-                                </span>
-                                <div className={`w-7 h-7 rounded-xl flex items-center justify-center ${adminAliadosFilter === 'todos' ? 'bg-white/20 text-white' : 'bg-indigo-50 text-indigo-500'}`}>
-                                  <Store size={14} />
-                                </div>
-                              </div>
-                              <p className="text-2xl font-mono font-black">
-                                {marcasAliadas.length}
-                              </p>
-                            </button>
-                          </div>
-
-                          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                            {/* Formulario Registro Directo Admin */}
-                            <div className="lg:col-span-4 bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-4">
-                              <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
-                                <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600">
-                                  <Store size={18} />
-                                </div>
-                                <div>
-                                  <h4 className="text-sm font-bold text-slate-800">
-                                    {editingMarcaId ? 'Editar Marca Aliada' : 'Crear Marca Verificada'}
-                                  </h4>
-                                  <p className="text-[10px] text-slate-400 font-medium">Registro directo aprobado por Administración</p>
-                                </div>
-                              </div>
-
-                              <form onSubmit={guardarMarcaAliada} className="space-y-3.5">
-                                <div>
-                                  <label className="text-[10px] uppercase font-black text-slate-500 ml-1">Nombre Comercial</label>
-                                  <input 
-                                    required
-                                    type="text" 
-                                    placeholder="Ej: Restaurante El Sabor Real"
-                                    className="w-full bg-slate-50 border border-slate-100 rounded-xl p-3 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none"
-                                    value={nuevaMarcaNombre}
-                                    onChange={e => setNuevaMarcaNombre(e.target.value)}
-                                  />
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-3">
-                                  <div>
-                                    <label className="text-[10px] uppercase font-black text-slate-500 ml-1">Categoría</label>
-                                    <select 
-                                      className="w-full bg-slate-50 border border-slate-100 rounded-xl p-2.5 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none hover:bg-slate-100/50 cursor-pointer"
-                                      value={nuevaMarcaCategoria}
-                                      onChange={e => setNuevaMarcaCategoria(e.target.value)}
-                                    >
-                                      <option value="Restaurante">🍔 Restaurante</option>
-                                      <option value="Droguería">💊 Droguería</option>
-                                      <option value="Ferretería">🔨 Ferretería</option>
-                                      <option value="Supermercado">🛒 Supermercado</option>
-                                      <option value="Tecnología">💻 Tecnología</option>
-                                      <option value="Moda">👗 Moda y Calzado</option>
-                                      <option value="Mascotas">🐾 Mascotas</option>
-                                      <option value="Otro">📦 Otro Negocio</option>
-                                    </select>
-                                  </div>
-
-                                  <div>
-                                    <label className="text-[10px] uppercase font-black text-slate-500 ml-1">WhatsApp</label>
-                                    <input 
-                                      required
-                                      type="tel" 
-                                      placeholder="Ej: 3123456789"
-                                      className="w-full bg-slate-50 border border-slate-100 rounded-xl p-2.5 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none font-mono"
-                                      value={nuevaMarcaWhatsapp}
-                                      onChange={e => setNuevaMarcaWhatsapp(e.target.value)}
-                                    />
-                                  </div>
-                                </div>
-
-                                <div>
-                                  <label className="text-[10px] uppercase font-black text-slate-500 ml-1">Ciudad de Cobertura</label>
-                                  <input 
-                                    required
-                                    type="text" 
-                                    placeholder="Ej: Fusagasugá"
-                                    className="w-full bg-slate-50 border border-slate-100 rounded-xl p-2.5 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none"
-                                    value={nuevaMarcaCiudad}
-                                    onChange={e => setNuevaMarcaCiudad(e.target.value)}
-                                  />
-                                  <div className="flex flex-wrap gap-1 mt-1.5">
-                                    {['Fusagasugá', 'Bogotá', 'Girardot', 'Melgar', 'Pasca', 'Silvania', 'Arauca'].map((city, cIdx) => (
-                                      <button
-                                        key={`marca-quick-city-${city}-${cIdx}`}
-                                        type="button"
-                                        onClick={() => setNuevaMarcaCiudad(city)}
-                                        className={`text-[8px] font-bold px-2 py-0.5 rounded-md transition-colors ${nuevaMarcaCiudad.toLowerCase() === city.toLowerCase() ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
-                                      >
-                                        {city}
-                                      </button>
-                                    ))}
-                                  </div>
-                                </div>
-
-                                <div>
-                                  <label className="text-[10px] uppercase font-black text-slate-500 ml-1">Dirección Física</label>
-                                  <div className="relative">
-                                    <MapPin size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-rose-500" />
-                                    <input 
-                                      required
-                                      type="text" 
-                                      placeholder="Ej: Calle 8 con Carrera 6"
-                                      className="w-full bg-slate-50 border border-slate-100 rounded-xl p-2.5 pl-9 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none"
-                                      value={nuevaMarcaDireccion}
-                                      onChange={e => setNuevaMarcaDireccion(e.target.value)}
-                                    />
-                                  </div>
-                                </div>
-
-                                {/* Drag and Drop Admin Brand Logo Upload */}
-                                <div>
-                                  <label className="text-[10px] uppercase font-black text-slate-500 ml-1">Logo del Comercio (Opcional)</label>
-                                  <div 
-                                    onDragOver={(e) => {
-                                      e.preventDefault();
-                                      setAdminLogoDragActive(true);
-                                    }}
-                                    onDragLeave={() => setAdminLogoDragActive(false)}
-                                    onDrop={(e) => {
-                                      e.preventDefault();
-                                      setAdminLogoDragActive(false);
-                                      if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-                                        handleLogoUpload(e.dataTransfer.files[0], setNuevaMarcaLogo);
-                                      }
-                                    }}
-                                    className={`mt-1 border-2 border-dashed rounded-2xl p-3 transition-all flex flex-col items-center justify-center gap-1.5 cursor-pointer relative overflow-hidden ${
-                                      adminLogoDragActive 
-                                        ? 'border-indigo-500 bg-indigo-50/50' 
-                                        : nuevaMarcaLogo 
-                                          ? 'border-emerald-300 bg-emerald-50/10' 
-                                          : 'border-slate-200 bg-slate-50/50 hover:bg-slate-50 hover:border-slate-300'
-                                    }`}
-                                  >
-                                    <input 
-                                      type="file" 
-                                      accept="image/*"
-                                      onChange={(e) => {
-                                        if (e.target.files && e.target.files[0]) {
-                                          handleLogoUpload(e.target.files[0], setNuevaMarcaLogo);
-                                        }
-                                      }}
-                                      className="absolute inset-0 opacity-0 cursor-pointer z-10"
-                                    />
-                                    {nuevaMarcaLogo ? (
-                                      <div className="flex flex-col items-center gap-1.5 text-center">
-                                        <img 
-                                          src={nuevaMarcaLogo} 
-                                          alt="Logo previsualización" 
-                                          className="w-12 h-12 rounded-xl object-cover border border-slate-100 shadow-sm"
-                                          referrerPolicy="no-referrer"
-                                        />
-                                        <div className="space-y-0.5">
-                                          <p className="text-[9px] font-black text-emerald-600 uppercase tracking-wider flex items-center gap-1 justify-center">
-                                            <Check size={11} /> ¡Logo cargado!
-                                          </p>
-                                          <button 
-                                            type="button"
-                                            onClick={(e) => {
-                                              e.preventDefault();
-                                              e.stopPropagation();
-                                              setNuevaMarcaLogo('');
-                                            }}
-                                            className="text-[8px] text-rose-500 hover:text-rose-700 font-bold uppercase tracking-wider underline relative z-20 cursor-pointer"
-                                          >
-                                            Eliminar
-                                          </button>
-                                        </div>
-                                      </div>
-                                    ) : (
-                                      <div className="flex flex-col items-center gap-1 text-center py-1">
-                                        <div className="w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center text-slate-400">
-                                          <Upload size={14} />
-                                        </div>
-                                        <div className="space-y-0.5">
-                                          <p className="text-[9px] font-black text-slate-700 leading-tight">
-                                            Sube el logo o <span className="text-indigo-600 underline">busca archivo</span>
-                                          </p>
-                                          <p className="text-[7.5px] text-slate-400">PNG o JPG (Max 2MB)</p>
-                                        </div>
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-
-                                <div className="flex gap-2 pt-2">
-                                  <button
-                                    type="submit"
-                                    className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-black py-3 px-4 rounded-xl text-xs uppercase tracking-wider transition-colors shadow-sm flex items-center justify-center gap-1.5 cursor-pointer"
-                                  >
-                                    <Check size={15} />
-                                    {editingMarcaId ? 'Guardar Cambios' : 'Guardar y Aprobar'}
-                                  </button>
-                                  {editingMarcaId && (
-                                    <button
-                                      type="button"
-                                      onClick={cancelarEditarMarca}
-                                      className="bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-3 px-4 rounded-xl text-xs transition-colors cursor-pointer"
-                                    >
-                                      Cancelar
-                                    </button>
-                                  )}
-                                </div>
-                              </form>
-                            </div>
-
-                            {/* Panel de Moderación y Catálogo de Aliados */}
-                            <div className="lg:col-span-8 space-y-4">
-                              {/* Search and Filters Bar */}
-                              <div className="bg-white p-4 rounded-3xl border border-slate-100 shadow-sm space-y-3">
-                                <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
-                                  <div className="relative w-full sm:w-72">
-                                    <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                                    <input 
-                                      type="text" 
-                                      placeholder="Buscar comercio, creador, ciudad..."
-                                      className="w-full bg-slate-50 border border-slate-100 rounded-xl py-2 pr-3 pl-9 text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500"
-                                      value={adminAliadosSearch}
-                                      onChange={e => setAdminAliadosSearch(e.target.value)}
-                                    />
-                                    {adminAliadosSearch && (
-                                      <button 
-                                        onClick={() => setAdminAliadosSearch('')}
-                                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                                      >
-                                        <X size={13} />
-                                      </button>
-                                    )}
-                                  </div>
-
-                                  <div className="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto pb-1 sm:pb-0">
-                                    {[
-                                      { id: 'pendientes', label: 'En Espera', count: marcasAliadas.filter(isMarcaPendiente).length, color: 'amber' },
-                                      { id: 'aprobados', label: 'Aprobadas', count: marcasAliadas.filter(isMarcaAprobada).length, color: 'emerald' },
-                                      { id: 'rechazados', label: 'Rechazadas', count: marcasAliadas.filter(isMarcaRechazada).length, color: 'rose' },
-                                      { id: 'todos', label: 'Todas', count: marcasAliadas.length, color: 'slate' }
-                                    ].map((tab, tIdx) => (
-                                      <button
-                                        key={`admin-aliados-filter-${tab.id}-${tIdx}`}
-                                        onClick={() => setAdminAliadosFilter(tab.id as any)}
-                                        className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
-                                          adminAliadosFilter === tab.id
-                                            ? 'bg-slate-900 text-white shadow-sm'
-                                            : 'bg-slate-50 text-slate-500 hover:bg-slate-100 hover:text-slate-800'
-                                        }`}
-                                      >
-                                        <span>{tab.label}</span>
-                                        <span className={`px-1.5 py-0.2 rounded-md text-[9px] ${
-                                          adminAliadosFilter === tab.id 
-                                            ? 'bg-white/20 text-white' 
-                                            : tab.id === 'pendientes' && tab.count > 0 
-                                              ? 'bg-amber-100 text-amber-700 font-black' 
-                                              : 'bg-slate-200 text-slate-600'
-                                        }`}>
-                                          {tab.count}
-                                        </span>
-                                      </button>
-                                    ))}
-                                  </div>
-                                </div>
-                              </div>
-
-                              {/* Listado de Marcas según Filtro */}
-                              {(() => {
-                                const filtered = marcasAliadas.filter(marca => {
-                                  // Moderation filter
-                                  if (adminAliadosFilter === 'pendientes' && !isMarcaPendiente(marca)) return false;
-                                  if (adminAliadosFilter === 'aprobados' && !isMarcaAprobada(marca)) return false;
-                                  if (adminAliadosFilter === 'rechazados' && !isMarcaRechazada(marca)) return false;
-
-                                  // Search filter
-                                  if (adminAliadosSearch.trim()) {
-                                    const q = adminAliadosSearch.toLowerCase().trim();
-                                    const matchNom = marca.nombre?.toLowerCase().includes(q);
-                                    const matchDir = marca.direccion?.toLowerCase().includes(q);
-                                    const matchCiu = marca.ciudad?.toLowerCase().includes(q);
-                                    const matchTel = marca.whatsapp?.toLowerCase().includes(q);
-                                    const matchCat = marca.categoria?.toLowerCase().includes(q);
-                                    const matchCreador = marca.creadorNombre?.toLowerCase().includes(q) || marca.creadorEmail?.toLowerCase().includes(q);
-                                    return matchNom || matchDir || matchCiu || matchTel || matchCat || matchCreador;
-                                  }
-                                  return true;
-                                });
-
-                                if (filtered.length === 0) {
-                                  return (
-                                    <div className="bg-white p-12 rounded-3xl border border-slate-100 text-center space-y-3 shadow-sm">
-                                      <div className="w-14 h-14 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto text-slate-300">
-                                        <Store size={26} />
-                                      </div>
-                                      <div>
-                                        <h5 className="text-sm font-bold text-slate-700">No hay comercios en esta vista</h5>
-                                        <p className="text-xs text-slate-400">
-                                          {adminAliadosFilter === 'pendientes' 
-                                            ? '¡Excelente! No hay marcas aliadas pendientes de validación anti-spam.' 
-                                            : 'No se encontraron registros con los filtros seleccionados.'}
-                                        </p>
-                                      </div>
-                                    </div>
-                                  );
-                                }
-
-                                return (
-                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[75vh] overflow-y-auto pr-1">
-                                    {filtered.map((marca, mIdx) => {
-                                      const isPend = isMarcaPendiente(marca);
-                                      const isAprob = isMarcaAprobada(marca);
-                                      const isRech = isMarcaRechazada(marca);
-
-                                      let catBg = 'bg-orange-50 text-orange-600 border-orange-100';
-                                      if (marca.categoria === 'Droguería') catBg = 'bg-rose-50 text-rose-600 border-rose-100';
-                                      if (marca.categoria === 'Ferretería') catBg = 'bg-amber-50 text-amber-600 border-amber-100';
-                                      if (marca.categoria === 'Supermercado') catBg = 'bg-emerald-50 text-emerald-600 border-emerald-100';
-                                      if (marca.categoria === 'Tecnología') catBg = 'bg-blue-50 text-blue-600 border-blue-100';
-                                      if (marca.categoria === 'Moda') catBg = 'bg-purple-50 text-purple-600 border-purple-100';
-
-                                      const waClean = (marca.whatsapp || '').replace(/\D/g, '');
-                                      const waLink = `https://wa.me/57${waClean}?text=${encodeURIComponent(`Hola ${marca.nombre}, te contactamos de la administración de Ruedas Rápidas para validar el registro de tu comercio en la red.`)}`;
-
-                                      return (
-                                        <div 
-                                          key={`marca-admin-${marca.id || mIdx}-${mIdx}`} 
-                                          className={`p-4.5 rounded-3xl bg-white border transition-all flex flex-col justify-between relative shadow-sm hover:shadow-md ${
-                                            isPend 
-                                              ? 'border-amber-300 ring-4 ring-amber-500/5' 
-                                              : isRech 
-                                                ? 'border-rose-200 bg-rose-50/10' 
-                                                : 'border-slate-100 hover:border-slate-200'
-                                          }`}
-                                        >
-                                          {/* Status Header Badge */}
-                                          <div className="space-y-2.5">
-                                            <div className="flex items-center justify-between gap-2">
-                                              <div className="flex items-center gap-1.5 flex-wrap">
-                                                <span className={`text-[8.5px] font-black uppercase px-2 py-0.5 rounded-md border ${catBg}`}>
-                                                  {marca.categoria || 'Comercio'}
-                                                </span>
-                                                <span className="text-[9px] font-bold text-slate-500 uppercase bg-slate-100 px-1.5 py-0.5 rounded-md">
-                                                  {marca.ciudad}
-                                                </span>
-                                              </div>
-
-                                              {isPend && (
-                                                <span className="flex items-center gap-1 text-[8px] font-black text-amber-700 bg-amber-100 border border-amber-200 px-2 py-0.5 rounded-full uppercase tracking-wider animate-pulse">
-                                                  <Clock size={10} /> En Espera
-                                                </span>
-                                              )}
-                                              {isAprob && (
-                                                <span className="flex items-center gap-1 text-[8px] font-black text-emerald-700 bg-emerald-100 border border-emerald-200 px-2 py-0.5 rounded-full uppercase tracking-wider">
-                                                  <CheckCheck size={10} /> Aprobado
-                                                </span>
-                                              )}
-                                              {isRech && (
-                                                <span className="flex items-center gap-1 text-[8px] font-black text-rose-700 bg-rose-100 border border-rose-200 px-2 py-0.5 rounded-full uppercase tracking-wider">
-                                                  <Ban size={10} /> Rechazado
-                                                </span>
-                                              )}
-                                            </div>
-
-                                            {/* Brand Logo & Name */}
-                                            <div className="flex items-start gap-3">
-                                              <div className="w-12 h-12 rounded-2xl bg-slate-100 border border-slate-200/60 overflow-hidden shrink-0 flex items-center justify-center">
-                                                {marca.logo ? (
-                                                  <img src={marca.logo} alt={marca.nombre} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                                                ) : (
-                                                  <Store size={20} className="text-slate-400" />
-                                                )}
-                                              </div>
-                                              <div className="flex-1 min-w-0">
-                                                <h5 className="font-black text-sm text-slate-800 truncate leading-tight uppercase">
-                                                  {marca.nombre}
-                                                </h5>
-                                                <div className="flex items-center gap-1 text-xs text-slate-500 mt-1">
-                                                  <MapPin size={12} className="text-rose-500 shrink-0" />
-                                                  <span className="truncate text-[11px] font-medium" title={marca.direccion}>{marca.direccion}</span>
-                                                </div>
-                                              </div>
-                                            </div>
-
-                                            {/* Anti-Spam Security Card */}
-                                            <div className="bg-slate-50 p-2.5 rounded-2xl border border-slate-100/80 space-y-1.5 text-[10.5px]">
-                                              <div className="flex items-center justify-between">
-                                                <span className="text-[8px] font-black text-slate-400 uppercase tracking-wider">Solicitud / Creador</span>
-                                                <span className="text-[8px] font-bold text-slate-400">
-                                                  {marca.fechaCreacion ? new Date(marca.fechaCreacion).toLocaleDateString([], { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'Directo'}
-                                                </span>
-                                              </div>
-                                              <div className="flex items-center justify-between text-slate-700">
-                                                <span className="font-bold truncate max-w-[140px]">
-                                                  {marca.creadorNombre || marca.creadorEmail || 'Admin Directo'}
-                                                </span>
-                                                <a 
-                                                  href={waLink}
-                                                  target="_blank"
-                                                  rel="noreferrer"
-                                                  className="inline-flex items-center gap-1 text-[9px] font-black text-emerald-600 bg-emerald-50 hover:bg-emerald-100 px-2 py-0.5 rounded-lg border border-emerald-200 transition-colors"
-                                                  title="Verificar y Chatear por WhatsApp"
-                                                >
-                                                  <Zap size={10} />
-                                                  <span>{marca.whatsapp}</span>
-                                                </a>
-                                              </div>
-
-                                              {isRech && marca.motivoRechazo && (
-                                                <div className="bg-rose-50 border border-rose-100 p-1.5 rounded-xl text-[9px] text-rose-700 font-bold">
-                                                  <span className="font-black">Motivo rechazo:</span> {marca.motivoRechazo}
-                                                </div>
-                                              )}
-
-                                              {marca.oferta?.activa && (
-                                                <div className="flex items-center justify-between bg-pink-50/70 border border-pink-100 px-2 py-1 rounded-xl text-[9px] text-pink-700 font-bold">
-                                                  <span className="flex items-center gap-1">
-                                                    <span>⚡</span>
-                                                    <span className="truncate max-w-[150px]">{marca.oferta.titulo}</span>
-                                                  </span>
-                                                  <span className="font-mono font-black">${Number(marca.oferta.precioDescuento).toLocaleString()}</span>
-                                                </div>
-                                              )}
-                                            </div>
-                                          </div>
-
-                                          {/* Action Buttons */}
-                                          <div className="pt-3 border-t border-slate-100 space-y-2 mt-3">
-                                            {/* Fast Moderation Actions */}
-                                            {isPend && (
-                                              <div className="grid grid-cols-2 gap-2">
-                                                <button
-                                                  disabled={isProcessingMarcaAction === marca.id}
-                                                  onClick={() => aprobarMarcaAliada(marca.id, marca.nombre)}
-                                                  className="h-9 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black rounded-xl text-[10px] uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 shadow-sm shadow-emerald-600/20 cursor-pointer"
-                                                >
-                                                  <Check size={14} />
-                                                  {isProcessingMarcaAction === marca.id ? 'Aprobando...' : 'Aprobar'}
-                                                </button>
-
-                                                <button
-                                                  disabled={isProcessingMarcaAction === marca.id}
-                                                  onClick={() => setMarcaToRejectModal({
-                                                    isOpen: true,
-                                                    marca: marca,
-                                                    motivo: 'Teléfono de WhatsApp no válido o no responde',
-                                                    customMotivo: ''
-                                                  })}
-                                                  className="h-9 bg-rose-50 hover:bg-rose-100 text-rose-600 active:scale-95 border border-rose-200 font-black rounded-xl text-[10px] uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-                                                >
-                                                  <Ban size={14} />
-                                                  Rechazar
-                                                </button>
-                                              </div>
-                                            )}
-
-                                            {isRech && (
-                                              <div className="flex gap-2">
-                                                <button
-                                                  disabled={isProcessingMarcaAction === marca.id}
-                                                  onClick={() => aprobarMarcaAliada(marca.id, marca.nombre)}
-                                                  className="flex-1 h-9 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black rounded-xl text-[10px] uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-                                                >
-                                                  <Check size={14} />
-                                                  Aprobar Ahora
-                                                </button>
-                                                <button
-                                                  disabled={isProcessingMarcaAction === marca.id}
-                                                  onClick={() => reabrirRevisionMarca(marca.id, marca.nombre)}
-                                                  className="h-9 px-3 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 font-bold rounded-xl text-[10px] transition-all flex items-center justify-center gap-1 cursor-pointer"
-                                                  title="Volver a poner en espera"
-                                                >
-                                                  <RefreshCw size={12} />
-                                                  A Espera
-                                                </button>
-                                              </div>
-                                            )}
-
-                                            {isAprob && (
-                                              <div className="flex gap-2">
-                                                <button
-                                                  disabled={isProcessingMarcaAction === marca.id}
-                                                  onClick={() => reabrirRevisionMarca(marca.id, marca.nombre)}
-                                                  className="flex-1 h-8 bg-slate-100 hover:bg-amber-50 hover:text-amber-700 text-slate-600 border border-slate-200 font-black rounded-xl text-[9px] uppercase tracking-wider transition-all flex items-center justify-center gap-1 cursor-pointer"
-                                                >
-                                                  <Clock size={12} />
-                                                  Pausar / A Espera
-                                                </button>
-                                              </div>
-                                            )}
-
-                                            {/* Secondary Utilities */}
-                                            <div className="flex items-center gap-1.5 pt-1">
-                                              <button
-                                                onClick={() => setMarcaToInspectModal(marca)}
-                                                className="flex-1 bg-slate-50 hover:bg-slate-100 text-slate-600 font-bold py-1.5 rounded-lg text-[9.5px] transition-colors flex items-center justify-center gap-1 border border-slate-200/60 cursor-pointer"
-                                              >
-                                                <Eye size={12} />
-                                                Detalles
-                                              </button>
-                                              <button
-                                                onClick={() => iniciarEditarMarca(marca)}
-                                                className="flex-1 bg-slate-50 hover:bg-slate-100 text-slate-600 font-bold py-1.5 rounded-lg text-[9.5px] transition-colors flex items-center justify-center gap-1 border border-slate-200/60 cursor-pointer"
-                                              >
-                                                <Edit size={12} />
-                                                Editar
-                                              </button>
-                                              <button
-                                                onClick={() => {
-                                                  abrirModalEliminar({
-                                                    id: marca.id,
-                                                    tipo: 'aliado',
-                                                    nombre: marca.nombre || 'Comercio Aliado',
-                                                    telefono: marca.whatsapp,
-                                                    motivoSugerido: isMarcaRechazada(marca) 
-                                                      ? 'Comercio rechazado por filtros anti-spam' 
-                                                      : (!marca.whatsapp 
-                                                          ? 'Comercio sin datos de contacto' 
-                                                          : 'Depuración a criterio del administrador'),
-                                                    detalles: `Categoría: ${marca.categoria || 'N/A'} • Ciudad: ${marca.ciudad || 'N/A'} • Dirección: ${marca.direccion || 'N/A'}`
-                                                  });
-                                                }}
-                                                className="bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-100 py-1.5 px-2.5 rounded-lg text-[9.5px] font-bold transition-colors cursor-pointer"
-                                                title="Eliminar de la plataforma"
-                                              >
-                                                <Trash2 size={12} />
-                                              </button>
-                                            </div>
-                                          </div>
-                                        </div>
-                                      );
-                                    })}
-                                  </div>
-                                );
-                              })()}
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* SUBTAB: DEPURACIÓN & CONTROL ANTI-SPAM */}
-                      {adminSubTab === 'depuracion' && (
-                        <AdminDepuracionTab
-                          allUsers={allUsers}
-                          allDrivers={allDrivers}
-                          marcasAliadas={marcasAliadas}
-                          user={user}
-                          depuracionEntityType={depuracionEntityType}
-                          setDepuracionEntityType={setDepuracionEntityType}
-                          depuracionFilter={depuracionFilter}
-                          setDepuracionFilter={setDepuracionFilter}
-                          depuracionSearchTerm={depuracionSearchTerm}
-                          setDepuracionSearchTerm={setDepuracionSearchTerm}
-                          selectedDepuracionIds={selectedDepuracionIds}
-                          setSelectedDepuracionIds={setSelectedDepuracionIds}
-                          checkUserStatus={checkUserStatus}
-                          checkDriverStatus={checkDriverStatus}
-                          checkAliadoStatus={checkAliadoStatus}
-                          abrirModalEliminar={abrirModalEliminar}
-                          abrirModalEliminarLote={abrirModalEliminarLote}
-                        />
-                      )}
-                    </motion.div>
-                  </AnimatePresence>
-                </div>
-              </motion.section>
-              )}
+              {/* Admin Panel rendered in Desktop Layout */}
             </main>
 
             {/* Bottom Navigation */}
@@ -15306,6 +15004,16 @@ export default function App() {
           currentUser={user}
           onClose={() => setActiveSharedTripId(null)}
           onRequestOpenLogin={() => setShowEmailLogin(true)}
+        />
+      )}
+
+      {/* Modal de Activación de Conductores (para el Administrador) */}
+      {showActivacionModal && (
+        <AdminDriversPanel
+          isModal={true}
+          isOpen={showActivacionModal}
+          adminUid={user?.uid}
+          onClose={() => setShowActivacionModal(false)}
         />
       )}
       </ErrorBoundary>
